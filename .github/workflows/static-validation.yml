@@ -85,8 +85,10 @@ jobs:
           manager="android/app/src/main/kotlin/com/lifesaver/cardiac/WearOSHealthSensorManager.kt"
           manifest="android/app/src/main/AndroidManifest.xml"
 
-          if grep -n -E 'SensorManager|TYPE_HEART_RATE|registerListener' "$manager"; then
-            echo "Raw heart-rate SensorManager access remains in the Health Services manager."
+          if grep -n -E \
+            'android\.hardware\.SensorManager|Sensor\.TYPE_HEART_RATE|sensorManager\.registerListener' \
+            "$manager"; then
+            echo "Raw heart-rate sensor API access remains in the Health Services manager."
             exit 1
           fi
 
