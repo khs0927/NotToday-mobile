@@ -94,6 +94,9 @@ Room은 현재 스냅샷과 append-only 전이 감사 로그를 별도 테이블
 - 영속화 성공 전 상태 전이를 노출하지 않음
 - 영속화 실패 시 accepted transition 롤백
 - 거부 전이도 감사 로그 경계로 전달
+- Android instrumentation에서 파일 DB를 닫고 다시 여는 재초기화를 검증
+- Android instrumentation에서 `DIALER_READY` 복구가 `SAFETY_CHECK`과 새 사용자 행동 요구로 정규화되는지 검증
+- Android instrumentation에서 snapshot 없는 고아 이벤트 로그가 초기 상태로 덮어써지지 않는지 검증
 
 ## 통합 순서
 
