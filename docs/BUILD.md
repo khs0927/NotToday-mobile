@@ -13,23 +13,55 @@
 | Android Gradle Plugin | 9.0.1 |
 | Kotlin Gradle Plugin | 2.3.20 |
 | compileSdk | 36 |
-| targetSdk | Flutter 3.44.8 기본값 36 |
+| targetSdk | 36 |
 | minSdk | 30 — Wear OS 3 이상 |
 | AndroidX Core KTX | 1.17.0 |
 | Wear UI 플러그인 | wear_plus 1.2.5 |
 | 진동 플러그인 | vibration 3.2.0 |
 
-## 2. 최초 재현 성공 증거
+## 2. 최종 재현 성공 증거
 
-2026년 8월 3일 다음 기준선에서 debug APK 생성에 성공했습니다.
+2026년 8월 3일 다음 기준선에서 debug APK 생성과 패키지 권한 검증에 성공했습니다.
 
-- 브랜치 커밋: `03ea4888935e4eccbf4d3fa6d8a2acb04df7f3ed`
-- GitHub Actions run: `30787690397`
-- CI merge commit: `3f83338a9e107ae5e276dde93d21b6000b84b173`
+- 브랜치 커밋: `4ec6d465d1692fd812f5ac86b19bc6b058606544`
+- PR merge-test commit: `48d2cc8b0a48f7dc06447edf1e196d786cbf3c12`
+- GitHub Actions run: `30788853452`
+- Artifact ID: `8846356169`
 - APK 파일 크기: `159,305,023 bytes` — 약 152 MiB
-- APK SHA-256: `e672ba85d2cc665b2294b835de575697c65cdf83c92b56116a8de6d7476d62a3`
-- Artifact ID: `8845961543`
-- Artifact ZIP 크기: `74,326,530 bytes`
+- APK SHA-256: `476f232305fb29a81420ad9c9b496cd10c42c2ed4864bcb3164d5646e70e89e1`
+- Artifact ZIP digest: `a98f1e0df9043f08da64f36b46f7d25ef5492cbd96ad9d6eaa3213f4123fab71`
+
+패키지 검사 결과:
+
+```text
+applicationId  com.lifesaver.cardiac.debug
+versionName    0.1.0-debug
+compileSdk     36
+minSdk         30
+targetSdk      36
+Wear feature   android.hardware.type.watch
+```
+
+최종 APK 권한:
+
+```text
+BODY_SENSORS — API 35 이하
+READ_HEART_RATE — API 36 이상
+FOREGROUND_SERVICE
+FOREGROUND_SERVICE_HEALTH
+POST_NOTIFICATIONS
+VIBRATE
+```
+
+다음 권한은 패키지에 존재하지 않음을 CI와 산출물 직접 검사로 확인했습니다.
+
+```text
+SEND_SMS
+CALL_PHONE
+ACCESS_FINE_LOCATION
+ACCESS_COARSE_LOCATION
+WAKE_LOCK
+```
 
 이 APK는 모든 주요 ABI와 Flutter debug 자산을 포함한 개발용 universal APK이므로 용량이 큽니다. 배포용 산출물이 아닙니다.
 
@@ -54,14 +86,7 @@ java -version
 flutter doctor -v
 ```
 
-Flutter 버전이 다르면 다음과 같이 3.44.8 기준 환경을 사용합니다.
-
-```bash
-flutter channel stable
-flutter version 3.44.8
-```
-
-사용하는 Flutter 버전 관리 도구가 있다면 FVM 또는 동등한 도구로 3.44.8을 고정해도 됩니다.
+Flutter 버전이 다르면 3.44.8 기준 환경을 사용합니다. FVM 또는 동등한 버전 관리 도구 사용을 권장합니다.
 
 ## 4. 깨끗한 빌드
 
@@ -115,7 +140,7 @@ adb install -r build/app/outputs/flutter-apk/app-debug.apk
 adb shell pm list packages | grep com.lifesaver.cardiac.debug
 ```
 
-Windows PowerShell에서는 `grep` 대신 `Select-String`을 사용합니다.
+Windows PowerShell:
 
 ```powershell
 adb shell pm list packages | Select-String "com.lifesaver.cardiac.debug"
@@ -174,6 +199,8 @@ GitHub Actions는 다음을 자동 확인합니다.
 - Flutter 정적 분석
 - Android debug APK 생성
 - APK SHA-256 생성
+- application ID, SDK 수준, Wear 기능 선언
+- 패키지 내부 SMS·전화·위치·WAKE_LOCK 금지 권한 부재
 - APK artifact 업로드
 
 최종 실기기 동작은 CI만으로 증명할 수 없으므로 별도의 Wear OS 기기 시험 결과가 필요합니다.
