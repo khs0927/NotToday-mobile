@@ -1,7 +1,7 @@
 name: nottoday_mobile
-description: Smartwatch Cardiac Anomaly Detection & Emergency Rescue System
+description: Wear OS safety-assistance prototype for heart-rate and fall-candidate monitoring
 publish_to: 'none'
-version: 1.0.0+1
+version: 0.1.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -11,7 +11,6 @@ dependencies:
     sdk: flutter
   wear: ^1.1.0
   vibration: ^1.8.4
-  google_fonts: ^6.1.0
   provider: ^6.1.1
 
 dev_dependencies:
