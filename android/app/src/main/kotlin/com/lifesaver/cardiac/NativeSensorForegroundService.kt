@@ -259,18 +259,19 @@ class NativeSensorForegroundService : Service() {
     }
 
     private fun publishEvent(event: Map<String, Any>) {
-        val publish = {
+        val publish: () -> Unit = {
             try {
                 eventSink?.success(event)
             } catch (exception: RuntimeException) {
                 Log.e(TAG, "Unable to publish telemetry to Flutter.", exception)
             }
+            Unit
         }
 
         if (Looper.myLooper() == Looper.getMainLooper()) {
             publish()
         } else {
-            mainHandler.post(publish)
+            mainHandler.post { publish() }
         }
     }
 
