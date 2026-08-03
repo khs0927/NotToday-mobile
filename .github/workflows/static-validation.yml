@@ -33,6 +33,8 @@ jobs:
             "android/gradle/wrapper/gradle-wrapper.properties"
             "android/app/src/main/AndroidManifest.xml"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/MainActivity.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachine.kt"
+            "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachineTest.kt"
             "docs/BUILD.md"
             "docs/SAFETY_MODEL.md"
             "docs/TEST_PLAN.md"
@@ -82,7 +84,7 @@ jobs:
   android-debug-build:
     needs: flutter-static-validation
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
       - name: Check out repository
@@ -129,6 +131,17 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug --no-pub
 
+      - name: Run native escalation unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -x android/gradlew || {
+            echo "Flutter build did not prepare android/gradlew"
+            exit 1
+          }
+          cd android
+          ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+
       - name: Verify APK and create checksum
         shell: bash
         run: |
@@ -165,7 +178,7 @@ jobs:
             exit 1
           fi
 
-      - name: Upload debug APK evidence
+      - name: Upload debug APK and test evidence
         uses: actions/upload-artifact@v4
         with:
           name: nottoday-wear-debug-${{ github.sha }}
@@ -174,5 +187,7 @@ jobs:
             build/app-debug.apk.sha256
             build/app-debug.badging.txt
             build/app-debug.permissions.txt
+            build/app/reports/tests/testDebugUnitTest/**
+            build/app/test-results/testDebugUnitTest/**
           if-no-files-found: error
           retention-days: 14
