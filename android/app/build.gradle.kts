@@ -64,6 +64,9 @@ dependencies {
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
+    // PassiveMonitoringClient is the supported all-day Wear OS health path.
+    implementation("androidx.health:health-services-client:1.1.0-rc02")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.room:room-testing:$roomVersion")
 }

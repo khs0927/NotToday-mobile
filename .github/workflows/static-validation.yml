@@ -33,15 +33,21 @@ jobs:
             "android/gradle/wrapper/gradle-wrapper.properties"
             "android/app/src/main/AndroidManifest.xml"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/MainActivity.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/WearOSHealthSensorManager.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/health/HeartRateSignalTracker.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/health/HeartRateTelemetryHub.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/health/HealthServicesHeartRateListenerService.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachine.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/EscalationEntities.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/EscalationDao.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/NotTodayDatabase.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/RoomEscalationTransitionStore.kt"
             "android/app/schemas/com.lifesaver.cardiac.persistence.NotTodayDatabase/1.json"
+            "android/app/src/test/kotlin/com/lifesaver/cardiac/health/HeartRateSignalTrackerTest.kt"
             "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachineTest.kt"
             "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/PersistentEscalationCoordinatorTest.kt"
             "docs/BUILD.md"
+            "docs/HEALTH_SERVICES.md"
             "docs/SAFETY_MODEL.md"
             "docs/TEST_PLAN.md"
             "docs/REMOTE_ORCHESTRATION.md"
@@ -71,6 +77,26 @@ jobs:
             echo "Prohibited automatic-call capability found."
             exit 1
           fi
+
+      - name: Verify Health Services boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          manager="android/app/src/main/kotlin/com/lifesaver/cardiac/WearOSHealthSensorManager.kt"
+          manifest="android/app/src/main/AndroidManifest.xml"
+
+          if grep -n -E \
+            'android\.hardware\.SensorManager|Sensor\.TYPE_HEART_RATE|sensorManager\.registerListener' \
+            "$manager"; then
+            echo "Raw heart-rate sensor API access remains in the Health Services manager."
+            exit 1
+          fi
+
+          grep -q 'PassiveMonitoringClient' "$manager"
+          grep -q 'HealthServicesHeartRateListenerService' "$manifest"
+          grep -q 'com.google.android.wearable.healthservices.permission.PASSIVE_DATA_BINDING' "$manifest"
+          grep -q 'android.permission.BODY_SENSORS_BACKGROUND' "$manifest"
+          grep -q 'android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND' "$manifest"
 
       - name: Set up Flutter 3.44.8
         uses: subosito/flutter-action@v2
@@ -204,6 +230,10 @@ jobs:
           grep -q "sdkVersion:'30'" build/app-debug.badging.txt
           grep -q "targetSdkVersion:'36'" build/app-debug.badging.txt
           grep -q "uses-feature: name='android.hardware.type.watch'" build/app-debug.badging.txt
+          grep -q "android.permission.BODY_SENSORS" build/app-debug.permissions.txt
+          grep -q "android.permission.BODY_SENSORS_BACKGROUND" build/app-debug.permissions.txt
+          grep -q "android.permission.health.READ_HEART_RATE" build/app-debug.permissions.txt
+          grep -q "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" build/app-debug.permissions.txt
 
           if grep -E \
             'android.permission.(SEND_SMS|CALL_PHONE|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|WAKE_LOCK)' \
