@@ -356,6 +356,48 @@ class EscalationStateMachineTest {
         assertEquals(10_000L, restored.currentSnapshot().updatedAtEpochMs)
     }
 
+    @Test
+    fun malformedSafetyCheckWithoutCandidateCannotBeRestored() {
+        assertRestoreRejected(
+            EscalationSnapshot(
+                stage = EscalationStage.SAFETY_CHECK,
+                sequence = 4L,
+                activeCandidateId = null,
+                stageEnteredAtEpochMs = 4_000L,
+                updatedAtEpochMs = 4_000L,
+                reason = "CORRUPTED",
+                cooldownUntilEpochMs = null,
+            ),
+        )
+    }
+
+    @Test
+    fun malformedResolvedSnapshotWithCandidateCannotBeRestored() {
+        assertRestoreRejected(
+            EscalationSnapshot(
+                stage = EscalationStage.RESOLVED,
+                sequence = 5L,
+                activeCandidateId = "stale-candidate",
+                stageEnteredAtEpochMs = 5_000L,
+                updatedAtEpochMs = 5_000L,
+                reason = "CORRUPTED",
+                cooldownUntilEpochMs = 35_000L,
+            ),
+        )
+    }
+
+    private fun assertRestoreRejected(snapshot: EscalationSnapshot) {
+        try {
+            EscalationStateMachine.restorePersisted(
+                persisted = snapshot,
+                restoredAtEpochMs = 6_000L,
+            )
+            throw AssertionError("Expected malformed snapshot to be rejected")
+        } catch (_: IllegalArgumentException) {
+            // Expected fail-closed restore.
+        }
+    }
+
     private fun startCandidate(
         machine: EscalationStateMachine,
         candidateId: String,
