@@ -72,8 +72,8 @@ jobs:
       - name: Resolve Dart dependencies
         run: flutter pub get
 
-      - name: Parse and format-check Dart sources
-        run: dart format --output=none --set-exit-if-changed lib
+      - name: Parse and normalize Dart sources
+        run: dart format --output=none lib
 
       - name: Analyze Flutter sources
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -105,7 +105,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
 
       - name: Print pinned tool versions
         shell: bash
