@@ -315,7 +315,7 @@ class EscalationStateMachine private constructor(
                 EscalationStage.RECHECK -> EscalationSnapshot(
                     stage = EscalationStage.RESOLVED,
                     sequence = persisted.sequence + 1L,
-                    activeCandidateId = persisted.activeCandidateId,
+                    activeCandidateId = null,
                     stageEnteredAtEpochMs = safeRestoreTime,
                     updatedAtEpochMs = safeRestoreTime,
                     reason = "RESTORED_UNVERIFIED_RECHECK",
