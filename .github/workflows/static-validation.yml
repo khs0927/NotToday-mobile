@@ -38,6 +38,7 @@ jobs:
             "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/EscalationDao.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/NotTodayDatabase.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/RoomEscalationTransitionStore.kt"
+            "android/app/schemas/com.lifesaver.cardiac.persistence.NotTodayDatabase/1.json"
             "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachineTest.kt"
             "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/PersistentEscalationCoordinatorTest.kt"
             "docs/BUILD.md"
@@ -157,6 +158,7 @@ jobs:
             echo "Room did not export a schema."
             exit 1
           }
+          git diff --exit-code -- android/app/schemas
           sha256sum "${schemas[@]}" | tee build/room-schema.sha256
 
           python - <<'PY'
