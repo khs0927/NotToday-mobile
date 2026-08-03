@@ -20,16 +20,21 @@
 
 목표: 새로운 개발자가 저장소를 받아 Wear OS debug APK를 만들 수 있게 합니다.
 
-- [ ] Flutter Android scaffold 복구
-- [ ] Gradle Wrapper 추가
-- [ ] compileSdk·targetSdk·minSdk 확정
-- [ ] JDK 17 기준 고정
-- [ ] Kotlin·AndroidX 의존성 확정
-- [ ] Android debug APK CI
-- [ ] 릴리스 서명과 비밀정보 분리
-- [ ] 로컬 설치 절차 작성
+- [x] Flutter Android scaffold 복구
+- [x] Gradle 배포판과 wrapper properties 고정
+- [x] compileSdk·targetSdk·minSdk 확정
+- [x] JDK 17 기준 고정
+- [x] Kotlin·AndroidX 의존성 확정
+- [x] Android debug APK CI
+- [x] APK 체크섬과 artifact 생성
+- [x] 패키지명·SDK·Wear 기능·금지 권한 CI 검사
+- [x] debug 키를 release signing에서 제거
+- [x] 로컬 설치 절차 작성
+- [ ] 표준 `gradlew` 스크립트와 wrapper JAR 저장소 포함 여부 확정
+- [ ] 서로 다른 개발자 환경 3곳에서 로컬 빌드 성공
+- [ ] Wear OS 실기기 설치 성공
 
-완료 조건:
+CI 완료 조건은 달성했습니다.
 
 ```text
 flutter pub get
@@ -37,7 +42,7 @@ flutter analyze
 flutter build apk --debug
 ```
 
-세 명의 서로 다른 환경에서 성공.
+Phase 1 전체 완료 조건은 세 명의 서로 다른 환경과 최소 한 대의 Wear OS 실기기에서 성공하는 것입니다.
 
 ## Phase 2 — Health Services 전환
 
