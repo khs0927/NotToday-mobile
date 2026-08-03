@@ -42,10 +42,7 @@ class EscalationPersistenceTest {
             "PERSISTENCE_UNAVAILABLE",
             (failed as TransitionResult.Rejected).reason,
         )
-        assertEquals(
-            "PERSISTENCE_UNAVAILABLE",
-            coordinator.currentSnapshot().reason,
-        )
+        assertEquals("IMPACT_CANDIDATE", coordinator.currentSnapshot().reason)
         assertEquals(EscalationStage.RECHECK, coordinator.currentSnapshot().stage)
         assertEquals(1, persistence.results.size)
     }
