@@ -27,16 +27,21 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
   @override
   void initState() {
     super.initState();
-    _startHapticPattern();
+    unawaited(_startHapticPattern());
     _startCountdown();
   }
 
   Future<void> _startHapticPattern() async {
-    if (await Vibration.hasVibrator() ?? false) {
-      await Vibration.vibrate(
-        pattern: <int>[500, 1000, 500, 1000],
-        repeat: 0,
-      );
+    try {
+      if (await Vibration.hasVibrator()) {
+        await Vibration.vibrate(
+          pattern: <int>[500, 1000, 500, 1000],
+          repeat: 0,
+        );
+      }
+    } on Object {
+      // Haptics are best-effort. The safety prompt must remain usable even if
+      // the device or plugin cannot start a vibration pattern.
     }
   }
 
@@ -44,7 +49,7 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
     _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
       if (_countdown <= 1) {
         timer.cancel();
-        _openDialerAndClose();
+        unawaited(_openDialerAndClose());
         return;
       }
 
@@ -83,7 +88,7 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
   @override
   void dispose() {
     _timer?.cancel();
-    Vibration.cancel();
+    unawaited(Vibration.cancel());
     super.dispose();
   }
 
