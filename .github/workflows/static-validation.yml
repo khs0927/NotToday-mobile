@@ -34,10 +34,17 @@ jobs:
             "android/app/src/main/AndroidManifest.xml"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/MainActivity.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachine.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/EscalationEntities.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/EscalationDao.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/NotTodayDatabase.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/persistence/RoomEscalationTransitionStore.kt"
+            "android/app/schemas/com.lifesaver.cardiac.persistence.NotTodayDatabase/1.json"
             "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachineTest.kt"
+            "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/PersistentEscalationCoordinatorTest.kt"
             "docs/BUILD.md"
             "docs/SAFETY_MODEL.md"
             "docs/TEST_PLAN.md"
+            "docs/REMOTE_ORCHESTRATION.md"
           )
 
           for path in "${required_files[@]}"; do
@@ -142,6 +149,33 @@ jobs:
           cd android
           ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
+      - name: Verify Room schema and summarize tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t schemas < <(find android/app/schemas -type f -name '*.json' | sort)
+          test "${#schemas[@]}" -gt 0 || {
+            echo "Room did not export a schema."
+            exit 1
+          }
+          git diff --exit-code -- android/app/schemas
+          sha256sum "${schemas[@]}" | tee build/room-schema.sha256
+
+          python - <<'PY'
+          import glob
+          import xml.etree.ElementTree as ET
+
+          totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
+          for path in glob.glob("build/app/test-results/testDebugUnitTest/TEST-*.xml"):
+              root = ET.parse(path).getroot()
+              for key in totals:
+                  totals[key] += int(root.attrib.get(key, 0))
+
+          print("Native test summary:", totals)
+          if totals["tests"] == 0 or totals["failures"] or totals["errors"]:
+              raise SystemExit(1)
+          PY
+
       - name: Verify APK and create checksum
         shell: bash
         run: |
@@ -187,6 +221,8 @@ jobs:
             build/app-debug.apk.sha256
             build/app-debug.badging.txt
             build/app-debug.permissions.txt
+            build/room-schema.sha256
+            android/app/schemas/**
             build/app/reports/tests/testDebugUnitTest/**
             build/app/test-results/testDebugUnitTest/**
           if-no-files-found: error

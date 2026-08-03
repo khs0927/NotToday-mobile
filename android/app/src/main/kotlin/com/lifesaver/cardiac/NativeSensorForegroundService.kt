@@ -14,10 +14,11 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.lifesaver.cardiac.escalation.DialerRequestSource
 import com.lifesaver.cardiac.escalation.EscalationCoordinator
-import com.lifesaver.cardiac.escalation.MonotonicEpochClock
 import com.lifesaver.cardiac.escalation.EscalationSnapshot
 import com.lifesaver.cardiac.escalation.EscalationStage
+import com.lifesaver.cardiac.escalation.MonotonicEpochClock
 import com.lifesaver.cardiac.escalation.TransitionResult
+import com.lifesaver.cardiac.persistence.RoomEscalationTransitionStore
 import io.flutter.plugin.common.EventChannel
 
 class NativeSensorForegroundService : Service() {
@@ -29,6 +30,7 @@ class NativeSensorForegroundService : Service() {
     private lateinit var epochClock: MonotonicEpochClock
     private val mainHandler = Handler(Looper.getMainLooper())
     private var monitoringActive = false
+    private var persistenceReady = false
 
     companion object {
         private const val TAG = "NativeSensorService"
@@ -57,6 +59,17 @@ class NativeSensorForegroundService : Service() {
         emergencyController = EmergencyDispatchController(this)
         escalationCoordinator = EscalationCoordinator()
 
+        try {
+            escalationCoordinator = EscalationCoordinator.createPersistent(
+                transitionStore = RoomEscalationTransitionStore(this),
+                restoredAtEpochMs = epochClock.now(),
+            )
+            persistenceReady = true
+        } catch (exception: RuntimeException) {
+            persistenceReady = false
+            Log.e(TAG, "Escalation persistence initialization failed.", exception)
+        }
+
         healthSensorManager = WearOSHealthSensorManager(this) { telemetry ->
             publishEvent(withSnapshot(telemetry))
         }
@@ -73,6 +86,21 @@ class NativeSensorForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         ensureForeground()
+
+        if (!persistenceReady) {
+            publishEvent(
+                withSnapshot(
+                    mapOf(
+                        "monitoring" to false,
+                        "storageReady" to false,
+                        "eventType" to "PERSISTENCE_UNAVAILABLE",
+                        "timestamp" to epochClock.now(),
+                    ),
+                ),
+            )
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
 
         when (intent?.action ?: ACTION_START_MONITORING) {
             ACTION_CONFIRM_SAFE -> {
@@ -106,15 +134,12 @@ class NativeSensorForegroundService : Service() {
     }
 
     override fun onDestroy() {
-        if (monitoringActive) {
-            healthSensorManager.stopMonitoring()
-            fallDetector.stop()
-        }
-        monitoringActive = false
+        stopMonitoringComponents()
         publishEvent(
             withSnapshot(
                 mapOf(
                     "monitoring" to false,
+                    "storageReady" to persistenceReady,
                     "eventType" to "MONITORING_STOPPED",
                     "timestamp" to epochClock.now(),
                 ),
@@ -126,6 +151,11 @@ class NativeSensorForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startMonitoring() {
+        if (!persistenceReady || escalationCoordinator.isPersistenceFaulted()) {
+            haltForPersistenceFailure()
+            return
+        }
+
         if (!monitoringActive) {
             healthSensorManager.startMonitoring()
             fallDetector.start()
@@ -136,6 +166,7 @@ class NativeSensorForegroundService : Service() {
             withSnapshot(
                 mapOf(
                     "monitoring" to true,
+                    "storageReady" to true,
                     "eventType" to "MONITORING_STARTED",
                     "timestamp" to epochClock.now(),
                 ),
@@ -241,6 +272,7 @@ class NativeSensorForegroundService : Service() {
         val payload = extras.toMutableMap()
         payload["eventType"] = eventType
         payload["monitoring"] = monitoringActive
+        payload["storageReady"] = persistenceReady
         payload["timestamp"] = epochClock.now()
 
         when (transition) {
@@ -253,6 +285,12 @@ class NativeSensorForegroundService : Service() {
                 payload["transitionAccepted"] = false
                 payload["transitionRejectionReason"] = transition.reason
                 payload.putAll(snapshotPayload(transition.current))
+
+                if (transition.reason.startsWith("PERSISTENCE_")) {
+                    payload["storageReady"] = false
+                    persistenceReady = false
+                    haltForPersistenceFailure()
+                }
             }
         }
 
@@ -260,7 +298,8 @@ class NativeSensorForegroundService : Service() {
     }
 
     private fun withSnapshot(event: Map<String, Any>): Map<String, Any> =
-        event + snapshotPayload(escalationCoordinator.currentSnapshot())
+        event + snapshotPayload(escalationCoordinator.currentSnapshot()) +
+            mapOf("storageReady" to persistenceReady)
 
     private fun snapshotPayload(snapshot: EscalationSnapshot): Map<String, Any> {
         val payload = mutableMapOf<String, Any>(
@@ -277,6 +316,19 @@ class NativeSensorForegroundService : Service() {
             payload["cooldownUntilEpochMs"] = it
         }
         return payload
+    }
+
+    private fun haltForPersistenceFailure() {
+        stopMonitoringComponents()
+        stopSelf()
+    }
+
+    private fun stopMonitoringComponents() {
+        if (monitoringActive) {
+            healthSensorManager.stopMonitoring()
+            fallDetector.stop()
+        }
+        monitoringActive = false
     }
 
     private fun publishEvent(event: Map<String, Any>) {

@@ -17,13 +17,22 @@ This repository is being advanced through stacked Draft pull requests and explic
 - `main`
   - `agent/buildable-mvp-safety-baseline` — PR #7
     - `agent/escalation-state-machine` — PR #8
+      - `agent/room-persistence` — PR #10
 
-## Next stack
+## Approved next stack
 
-- `agent/room-persistence`
 - `agent/health-services`
 - `agent/wear-emulator-validation`
 - `agent/phone-companion-boundary`
 - `agent/privacy-beta-controls`
+
+## Completed remote gates
+
+- reproducible Flutter/Android debug APK
+- packaged permission regression checks
+- deterministic escalation state machine
+- guarded sensor-candidate lifecycle
+- fail-closed Room persistence
+- checked-in Room schema equality check
 
 Each next branch is created only from a CI-green predecessor and remains Draft until its own gates are satisfied.
