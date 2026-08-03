@@ -144,6 +144,7 @@ flutter build apk --debug --no-pub
 ## 문서
 
 - [빌드 및 실기기 설치](docs/BUILD.md)
+- [Phase 1 상태 보고서](docs/PHASE1_STATUS.md)
 - [50개 역할 가상 검토 결과](docs/PM_50_ROLE_REVIEW.md)
 - [목표 아키텍처](docs/ARCHITECTURE.md)
 - [안전 모델](docs/SAFETY_MODEL.md)
