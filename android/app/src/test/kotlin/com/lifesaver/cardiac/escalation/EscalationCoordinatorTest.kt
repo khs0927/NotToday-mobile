@@ -60,6 +60,7 @@ class EscalationCoordinatorTest {
 
         assertAccepted(rejected, EscalationStage.RESOLVED)
         assertEquals("POST_IMPACT_MOTION", coordinator.currentSnapshot().reason)
+        assertEquals(null, coordinator.currentSnapshot().activeCandidateId)
     }
 
     @Test
@@ -96,16 +97,17 @@ class EscalationCoordinatorTest {
         val coordinator = EscalationCoordinator(
             EscalationStateMachine(initialTimestampEpochMs = 0L),
         )
+        val candidateId = "impact-300-1"
         coordinator.handleFallCandidate(
             FallCandidateEvent.Started(
-                candidateId = "impact-300-1",
+                candidateId = candidateId,
                 occurredAtEpochMs = 100L,
                 impactGForce = 4.5,
             ),
         )
         coordinator.handleFallCandidate(
             FallCandidateEvent.Verified(
-                candidateId = "impact-300-1",
+                candidateId = candidateId,
                 occurredAtEpochMs = 10_100L,
                 impactGForce = 4.5,
                 reason = "IMPACT_WITH_POST_EVENT_IMMOBILITY",
@@ -115,13 +117,90 @@ class EscalationCoordinatorTest {
         )
 
         val requested = coordinator.requestDialer(
+            candidateId = candidateId,
             source = DialerRequestSource.USER,
             occurredAtEpochMs = 10_200L,
         )
         assertAccepted(requested, EscalationStage.DIALER_READY)
 
-        val opened = coordinator.recordDialerOpened(10_300L)
+        val opened = coordinator.recordDialerOpened(
+            candidateId = candidateId,
+            occurredAtEpochMs = 10_300L,
+        )
         assertAccepted(opened, EscalationStage.RESOLVED)
+    }
+
+    @Test
+    fun dialerOutcomeWithWrongCandidateIsRejected() {
+        val coordinator = EscalationCoordinator(
+            EscalationStateMachine(initialTimestampEpochMs = 0L),
+        )
+        val candidateId = "impact-400-1"
+        coordinator.handleFallCandidate(
+            FallCandidateEvent.Started(
+                candidateId = candidateId,
+                occurredAtEpochMs = 100L,
+                impactGForce = 4.5,
+            ),
+        )
+        coordinator.handleFallCandidate(
+            FallCandidateEvent.Verified(
+                candidateId = candidateId,
+                occurredAtEpochMs = 10_100L,
+                impactGForce = 4.5,
+                reason = "IMPACT_WITH_POST_EVENT_IMMOBILITY",
+                sampleCount = 100,
+                postImpactStdDevG = 0.02,
+            ),
+        )
+        coordinator.requestDialer(
+            candidateId = candidateId,
+            source = DialerRequestSource.USER,
+            occurredAtEpochMs = 10_200L,
+        )
+
+        val stale = coordinator.recordDialerOpened(
+            candidateId = "impact-other-4",
+            occurredAtEpochMs = 10_300L,
+        )
+
+        assertTrue(stale is TransitionResult.Rejected)
+        assertEquals("CANDIDATE_MISMATCH", (stale as TransitionResult.Rejected).reason)
+        assertEquals(EscalationStage.DIALER_READY, coordinator.currentSnapshot().stage)
+    }
+
+    @Test
+    fun safetyConfirmationWithWrongCandidateIsRejected() {
+        val coordinator = EscalationCoordinator(
+            EscalationStateMachine(initialTimestampEpochMs = 0L),
+        )
+        val candidateId = "impact-500-1"
+        coordinator.handleFallCandidate(
+            FallCandidateEvent.Started(
+                candidateId = candidateId,
+                occurredAtEpochMs = 100L,
+                impactGForce = 4.5,
+            ),
+        )
+        coordinator.handleFallCandidate(
+            FallCandidateEvent.Verified(
+                candidateId = candidateId,
+                occurredAtEpochMs = 10_100L,
+                impactGForce = 4.5,
+                reason = "IMPACT_WITH_POST_EVENT_IMMOBILITY",
+                sampleCount = 100,
+                postImpactStdDevG = 0.02,
+            ),
+        )
+
+        val stale = coordinator.confirmSafe(
+            candidateId = "impact-other-5",
+            occurredAtEpochMs = 10_200L,
+        )
+
+        assertTrue(stale is TransitionResult.Rejected)
+        assertEquals("CANDIDATE_MISMATCH", (stale as TransitionResult.Rejected).reason)
+        assertEquals(EscalationStage.SAFETY_CHECK, coordinator.currentSnapshot().stage)
     }
 
     private fun assertAccepted(
