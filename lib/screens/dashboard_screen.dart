@@ -26,8 +26,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final SensorServiceBridge nextBridge =
-        Provider.of<SensorServiceBridge>(context);
+    final SensorServiceBridge nextBridge = Provider.of<SensorServiceBridge>(
+      context,
+      listen: false,
+    );
 
     if (identical(nextBridge, _sensorBridge)) return;
 
@@ -56,6 +58,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
 
       _dialogOpen = false;
+      _handleSensorUpdate();
     });
   }
 
@@ -207,7 +210,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: badgeColor.withOpacity(0.2),
+        color: badgeColor.withValues(alpha: 0.2),
         border: Border.all(color: badgeColor),
         borderRadius: BorderRadius.circular(12),
       ),
