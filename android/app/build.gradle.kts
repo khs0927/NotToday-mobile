@@ -29,8 +29,8 @@ android {
             versionNameSuffix = "-debug"
         }
         release {
-            // Release publishing is blocked until signing and beta controls are completed.
-            signingConfig = signingConfigs.getByName("debug")
+            // No release signing configuration is committed. Public release
+            // remains blocked until privacy, signing, and beta gates are complete.
             isMinifyEnabled = false
             isShrinkResources = false
         }
