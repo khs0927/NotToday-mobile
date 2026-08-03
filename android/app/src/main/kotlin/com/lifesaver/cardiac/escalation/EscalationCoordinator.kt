@@ -42,27 +42,47 @@ class EscalationCoordinator(
             )
         }
 
-    fun confirmSafe(occurredAtEpochMs: Long): TransitionResult =
-        machine.handle(EscalationEvent.UserConfirmedSafe(occurredAtEpochMs))
+    fun confirmSafe(
+        candidateId: String,
+        occurredAtEpochMs: Long,
+    ): TransitionResult =
+        machine.handle(
+            EscalationEvent.UserConfirmedSafe(
+                candidateId = candidateId,
+                occurredAtEpochMs = occurredAtEpochMs,
+            ),
+        )
 
     fun requestDialer(
+        candidateId: String,
         source: DialerRequestSource,
         occurredAtEpochMs: Long,
     ): TransitionResult = machine.handle(
         EscalationEvent.DialerRequested(
+            candidateId = candidateId,
             source = source,
             occurredAtEpochMs = occurredAtEpochMs,
         ),
     )
 
-    fun recordDialerOpened(occurredAtEpochMs: Long): TransitionResult =
-        machine.handle(EscalationEvent.DialerOpened(occurredAtEpochMs))
+    fun recordDialerOpened(
+        candidateId: String,
+        occurredAtEpochMs: Long,
+    ): TransitionResult =
+        machine.handle(
+            EscalationEvent.DialerOpened(
+                candidateId = candidateId,
+                occurredAtEpochMs = occurredAtEpochMs,
+            ),
+        )
 
     fun recordDialerFailed(
+        candidateId: String,
         reason: String,
         occurredAtEpochMs: Long,
     ): TransitionResult = machine.handle(
         EscalationEvent.DialerFailed(
+            candidateId = candidateId,
             reason = reason,
             occurredAtEpochMs = occurredAtEpochMs,
         ),
