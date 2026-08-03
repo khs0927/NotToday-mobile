@@ -46,6 +46,7 @@ class IMUFallCollapseDetector(
     context: Context,
     private val isWearerSignalAvailable: () -> Boolean,
     private val onCandidateEvent: (FallCandidateEvent) -> Boolean,
+    private val nowEpochMs: () -> Long = { System.currentTimeMillis() },
 ) : SensorEventListener {
 
     private val sensorManager =
@@ -108,7 +109,7 @@ class IMUFallCollapseDetector(
         val z = sensorEvent.values[2].toDouble()
         val magnitudeAcceleration = sqrt(x * x + y * y + z * z)
         val gForce = magnitudeAcceleration / SensorManager.GRAVITY_EARTH
-        val now = System.currentTimeMillis()
+        val now = nowEpochMs()
 
         if (!isImpactDetected) {
             if (gForce >= IMPACT_THRESHOLD_G) {
@@ -176,7 +177,7 @@ class IMUFallCollapseDetector(
         val gravityLooksStationary =
             abs(mean - 1.0) <= MAX_MEAN_GRAVITY_DEVIATION_G
         val lowMotionDetected = standardDeviation <= MAX_IMMOBILITY_STDDEV_G
-        val now = System.currentTimeMillis()
+        val now = nowEpochMs()
 
         if (hasEnoughSamples && gravityLooksStationary && lowMotionDetected && wearerSignalPresent) {
             Log.w(
@@ -227,7 +228,7 @@ class IMUFallCollapseDetector(
         onCandidateEvent(
             FallCandidateEvent.Rejected(
                 candidateId = candidateId,
-                occurredAtEpochMs = System.currentTimeMillis(),
+                occurredAtEpochMs = nowEpochMs(),
                 impactGForce = impactGForce,
                 reason = reason,
                 sampleCount = postImpactSamples.size,
