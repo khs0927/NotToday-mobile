@@ -68,7 +68,8 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
     await Vibration.cancel();
 
     if (!mounted) return;
-    await context.read<SensorServiceBridge>().acknowledgeAlert();
+    final SensorServiceBridge bridge = context.read<SensorServiceBridge>();
+    await bridge.acknowledgeAlert(candidateId: bridge.activeCandidateId);
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -81,9 +82,11 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
     await Vibration.cancel();
 
     if (!mounted) return;
-    await context
-        .read<SensorServiceBridge>()
-        .openEmergencyDialer(timedOut: timedOut);
+    final SensorServiceBridge bridge = context.read<SensorServiceBridge>();
+    await bridge.openEmergencyDialer(
+      timedOut: timedOut,
+      candidateId: bridge.activeCandidateId,
+    );
     if (mounted) {
       Navigator.of(context).pop();
     }
