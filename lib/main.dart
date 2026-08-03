@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:wear/wear.dart';
+import 'package:wear_plus/wear_plus.dart';
 
 import 'screens/dashboard_screen.dart';
 import 'services/sensor_service.dart';
