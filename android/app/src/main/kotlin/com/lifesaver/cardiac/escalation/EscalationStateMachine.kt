@@ -232,6 +232,14 @@ class EscalationStateMachine private constructor(
             else -> reject(event, "EVENT_NOT_ALLOWED_FROM_DIALER_READY")
         }
 
+    /**
+     * Rolls back an accepted in-memory transition when its durable write fails.
+     * The coordinator calls this while holding its serialized event boundary.
+     */
+    internal fun restoreSnapshotForPersistenceFailure(previous: EscalationSnapshot) {
+        snapshot = validateSnapshot(previous)
+    }
+
     private fun handleResolved(event: EscalationEvent): TransitionResult =
         when (event) {
             is EscalationEvent.RecheckStarted -> {
