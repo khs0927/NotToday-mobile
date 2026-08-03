@@ -159,7 +159,7 @@ jobs:
           grep -q "uses-feature: name='android.hardware.type.watch'" build/app-debug.badging.txt
 
           if grep -E \
-            'android.permission.(SEND_SMS|CALL_PHONE|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION)' \
+            'android.permission.(SEND_SMS|CALL_PHONE|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|WAKE_LOCK)' \
             build/app-debug.permissions.txt; then
             echo "A packaged APK contains a prohibited permission."
             exit 1
