@@ -145,6 +145,16 @@ jobs:
           cd android
           ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
+      - name: Reclaim Android SDK image space for emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          if [ -d "$sdk_root/system-images" ]; then
+            sudo find "$sdk_root/system-images" -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +
+          fi
+          df -h "$sdk_root"
+
       - name: Enable KVM for Android emulator
         shell: bash
         run: |
@@ -162,7 +172,7 @@ jobs:
           profile: pixel_2
           ram-size: 1536M
           heap-size: 256M
-          disk-size: 1024M
+          disk-size: 768M
           sdcard-path-or-size: 64M
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
