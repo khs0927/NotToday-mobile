@@ -35,24 +35,23 @@ sealed interface EscalationEvent {
     ) : EscalationEvent
 
     data class UserConfirmedSafe(
+        val candidateId: String,
         override val occurredAtEpochMs: Long,
     ) : EscalationEvent
 
     data class DialerRequested(
+        val candidateId: String,
         val source: DialerRequestSource,
         override val occurredAtEpochMs: Long,
     ) : EscalationEvent
 
     data class DialerOpened(
+        val candidateId: String,
         override val occurredAtEpochMs: Long,
     ) : EscalationEvent
 
     data class DialerFailed(
-        val reason: String,
-        override val occurredAtEpochMs: Long,
-    ) : EscalationEvent
-
-    data class Reset(
+        val candidateId: String,
         val reason: String,
         override val occurredAtEpochMs: Long,
     ) : EscalationEvent
@@ -141,20 +140,6 @@ class EscalationStateMachine private constructor(
                 }
             }
 
-            is EscalationEvent.SafetyCheckRequired -> {
-                if (!isValidCandidateId(event.candidateId)) {
-                    reject(event, "INVALID_CANDIDATE_ID")
-                } else {
-                    transition(
-                        event = event,
-                        nextStage = EscalationStage.SAFETY_CHECK,
-                        candidateId = event.candidateId,
-                        reason = event.reason,
-                    )
-                }
-            }
-
-            is EscalationEvent.Reset -> reject(event, "ALREADY_NORMAL")
             else -> reject(event, "EVENT_NOT_ALLOWED_FROM_NORMAL")
         }
 
@@ -186,14 +171,26 @@ class EscalationStateMachine private constructor(
 
     private fun handleSafetyCheck(event: EscalationEvent): TransitionResult =
         when (event) {
-            is EscalationEvent.UserConfirmedSafe -> resolve(event, "USER_CONFIRMED_SAFE")
+            is EscalationEvent.UserConfirmedSafe -> {
+                if (!matchesActiveCandidate(event.candidateId)) {
+                    reject(event, "CANDIDATE_MISMATCH")
+                } else {
+                    resolve(event, "USER_CONFIRMED_SAFE")
+                }
+            }
 
-            is EscalationEvent.DialerRequested -> transition(
-                event = event,
-                nextStage = EscalationStage.DIALER_READY,
-                candidateId = snapshot.activeCandidateId,
-                reason = "DIALER_REQUESTED_${event.source.name}",
-            )
+            is EscalationEvent.DialerRequested -> {
+                if (!matchesActiveCandidate(event.candidateId)) {
+                    reject(event, "CANDIDATE_MISMATCH")
+                } else {
+                    transition(
+                        event = event,
+                        nextStage = EscalationStage.DIALER_READY,
+                        candidateId = event.candidateId,
+                        reason = "DIALER_REQUESTED_${event.source.name}",
+                    )
+                }
+            }
 
             is EscalationEvent.CandidateRejected -> {
                 if (!matchesActiveCandidate(event.candidateId)) {
@@ -208,22 +205,35 @@ class EscalationStateMachine private constructor(
 
     private fun handleDialerReady(event: EscalationEvent): TransitionResult =
         when (event) {
-            is EscalationEvent.DialerOpened -> resolve(event, "DIALER_OPENED")
-            is EscalationEvent.DialerFailed -> resolve(event, "DIALER_FAILED:${event.reason}")
-            is EscalationEvent.UserConfirmedSafe -> resolve(event, "USER_CONFIRMED_SAFE")
+            is EscalationEvent.DialerOpened -> {
+                if (!matchesActiveCandidate(event.candidateId)) {
+                    reject(event, "CANDIDATE_MISMATCH")
+                } else {
+                    resolve(event, "DIALER_OPENED")
+                }
+            }
+
+            is EscalationEvent.DialerFailed -> {
+                if (!matchesActiveCandidate(event.candidateId)) {
+                    reject(event, "CANDIDATE_MISMATCH")
+                } else {
+                    resolve(event, "DIALER_FAILED:${event.reason}")
+                }
+            }
+
+            is EscalationEvent.UserConfirmedSafe -> {
+                if (!matchesActiveCandidate(event.candidateId)) {
+                    reject(event, "CANDIDATE_MISMATCH")
+                } else {
+                    resolve(event, "USER_CONFIRMED_SAFE")
+                }
+            }
+
             else -> reject(event, "EVENT_NOT_ALLOWED_FROM_DIALER_READY")
         }
 
     private fun handleResolved(event: EscalationEvent): TransitionResult =
         when (event) {
-            is EscalationEvent.Reset -> transition(
-                event = event,
-                nextStage = EscalationStage.NORMAL,
-                candidateId = null,
-                reason = event.reason,
-                cooldownUntilEpochMs = null,
-            )
-
             is EscalationEvent.RecheckStarted -> {
                 if (isInCooldown(event.occurredAtEpochMs)) {
                     reject(event, "COOLDOWN_ACTIVE")
@@ -233,22 +243,6 @@ class EscalationStateMachine private constructor(
                     transition(
                         event = event,
                         nextStage = EscalationStage.RECHECK,
-                        candidateId = event.candidateId,
-                        reason = event.reason,
-                        cooldownUntilEpochMs = null,
-                    )
-                }
-            }
-
-            is EscalationEvent.SafetyCheckRequired -> {
-                if (isInCooldown(event.occurredAtEpochMs)) {
-                    reject(event, "COOLDOWN_ACTIVE")
-                } else if (!isValidCandidateId(event.candidateId)) {
-                    reject(event, "INVALID_CANDIDATE_ID")
-                } else {
-                    transition(
-                        event = event,
-                        nextStage = EscalationStage.SAFETY_CHECK,
                         candidateId = event.candidateId,
                         reason = event.reason,
                         cooldownUntilEpochMs = null,
@@ -315,32 +309,30 @@ class EscalationStateMachine private constructor(
             restoredAtEpochMs: Long,
             cooldownMs: Long = DEFAULT_COOLDOWN_MS,
         ): EscalationStateMachine {
-            require(restoredAtEpochMs >= persisted.updatedAtEpochMs) {
-                "restoredAtEpochMs must not precede persisted.updatedAtEpochMs"
-            }
+            val safeRestoreTime = maxOf(restoredAtEpochMs, persisted.updatedAtEpochMs)
 
             val normalized = when (persisted.stage) {
                 EscalationStage.RECHECK -> EscalationSnapshot(
                     stage = EscalationStage.RESOLVED,
                     sequence = persisted.sequence + 1L,
                     activeCandidateId = persisted.activeCandidateId,
-                    stageEnteredAtEpochMs = restoredAtEpochMs,
-                    updatedAtEpochMs = restoredAtEpochMs,
+                    stageEnteredAtEpochMs = safeRestoreTime,
+                    updatedAtEpochMs = safeRestoreTime,
                     reason = "RESTORED_UNVERIFIED_RECHECK",
-                    cooldownUntilEpochMs = safeAdd(restoredAtEpochMs, cooldownMs),
+                    cooldownUntilEpochMs = safeAdd(safeRestoreTime, cooldownMs),
                 )
 
                 EscalationStage.DIALER_READY -> EscalationSnapshot(
                     stage = EscalationStage.SAFETY_CHECK,
                     sequence = persisted.sequence + 1L,
                     activeCandidateId = persisted.activeCandidateId,
-                    stageEnteredAtEpochMs = restoredAtEpochMs,
-                    updatedAtEpochMs = restoredAtEpochMs,
+                    stageEnteredAtEpochMs = safeRestoreTime,
+                    updatedAtEpochMs = safeRestoreTime,
                     reason = "RESTORED_REQUIRES_FRESH_USER_ACTION",
                     cooldownUntilEpochMs = null,
                 )
 
-                else -> persisted.copy(updatedAtEpochMs = restoredAtEpochMs)
+                else -> persisted.copy(updatedAtEpochMs = safeRestoreTime)
             }
 
             return EscalationStateMachine(normalized, cooldownMs)
@@ -366,6 +358,11 @@ class EscalationStateMachine private constructor(
             if (value.stage == EscalationStage.NORMAL) {
                 require(value.activeCandidateId == null) {
                     "NORMAL must not retain an active candidate"
+                }
+            }
+            if (value.activeCandidateId != null) {
+                require(isValidCandidateId(value.activeCandidateId)) {
+                    "activeCandidateId is invalid"
                 }
             }
             return value.copy(reason = sanitizeReason(value.reason))
