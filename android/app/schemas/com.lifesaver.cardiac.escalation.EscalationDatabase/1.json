@@ -1,0 +1,170 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "18142962aa9a6d49ffa0a0c0b600d1e1",
+    "entities": [
+      {
+        "tableName": "escalation_snapshot",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`singletonId` INTEGER NOT NULL, `stage` TEXT NOT NULL, `sequence` INTEGER NOT NULL, `activeCandidateId` TEXT, `stageEnteredAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, `reason` TEXT NOT NULL, `cooldownUntilEpochMs` INTEGER, `lastAppendOrder` INTEGER NOT NULL, PRIMARY KEY(`singletonId`))",
+        "fields": [
+          {
+            "fieldPath": "singletonId",
+            "columnName": "singletonId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stage",
+            "columnName": "stage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sequence",
+            "columnName": "sequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeCandidateId",
+            "columnName": "activeCandidateId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "stageEnteredAtEpochMs",
+            "columnName": "stageEnteredAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cooldownUntilEpochMs",
+            "columnName": "cooldownUntilEpochMs",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastAppendOrder",
+            "columnName": "lastAppendOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "singletonId"
+          ]
+        }
+      },
+      {
+        "tableName": "escalation_event",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`appendOrder` INTEGER NOT NULL, `eventType` TEXT NOT NULL, `occurredAtEpochMs` INTEGER NOT NULL, `recordedAtEpochMs` INTEGER NOT NULL, `stageBefore` TEXT NOT NULL, `stageAfter` TEXT NOT NULL, `sequenceBefore` INTEGER NOT NULL, `sequenceAfter` INTEGER NOT NULL, `candidateId` TEXT, `source` TEXT, `reason` TEXT NOT NULL, `transitionAccepted` INTEGER NOT NULL, `transitionRejectionReason` TEXT, `synthetic` INTEGER NOT NULL, PRIMARY KEY(`appendOrder`))",
+        "fields": [
+          {
+            "fieldPath": "appendOrder",
+            "columnName": "appendOrder",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "eventType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurredAtEpochMs",
+            "columnName": "occurredAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordedAtEpochMs",
+            "columnName": "recordedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stageBefore",
+            "columnName": "stageBefore",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stageAfter",
+            "columnName": "stageAfter",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sequenceBefore",
+            "columnName": "sequenceBefore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sequenceAfter",
+            "columnName": "sequenceAfter",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateId",
+            "columnName": "candidateId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transitionAccepted",
+            "columnName": "transitionAccepted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transitionRejectionReason",
+            "columnName": "transitionRejectionReason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "synthetic",
+            "columnName": "synthetic",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "appendOrder"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '18142962aa9a6d49ffa0a0c0b600d1e1')"
+    ]
+  }
+}
