@@ -376,8 +376,7 @@ class EscalationStateMachine private constructor(
 
                 EscalationStage.RECHECK,
                 EscalationStage.SAFETY_CHECK,
-                EscalationStage.DIALER_READY,
-                -> {
+                EscalationStage.DIALER_READY -> {
                     require(value.activeCandidateId != null) {
                         "${value.stage} must retain an active candidate"
                     }
