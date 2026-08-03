@@ -13,14 +13,23 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
+    private enum class PermissionStage {
+        PRIMARY,
+        BACKGROUND,
+    }
+
     companion object {
         private const val METHOD_CHANNEL = "com.lifesaver.cardiac/sensor_service"
         private const val EVENT_CHANNEL = "com.lifesaver.cardiac/sensor_stream"
         private const val SENSOR_PERMISSION_REQUEST = 4102
-        private const val READ_HEART_RATE_PERMISSION = "android.permission.health.READ_HEART_RATE"
+        private const val READ_HEART_RATE_PERMISSION =
+            "android.permission.health.READ_HEART_RATE"
+        private const val READ_HEALTH_DATA_IN_BACKGROUND_PERMISSION =
+            "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
     }
 
     private var pendingStartResult: MethodChannel.Result? = null
+    private var pendingPermissionStage: PermissionStage? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -76,43 +85,95 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun startMonitoringWithPermissions(result: MethodChannel.Result) {
-        val missingPermissions = requiredRuntimePermissions().filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (missingPermissions.isEmpty()) {
-            startMonitoringService()
-            result.success(null)
-            return
-        }
-
         if (pendingStartResult != null) {
-            result.error("PERMISSION_REQUEST_ACTIVE", "A sensor permission request is already active.", null)
+            result.error(
+                "PERMISSION_REQUEST_ACTIVE",
+                "A health permission request is already active.",
+                null,
+            )
             return
         }
 
         pendingStartResult = result
+        requestPrimaryPermissionsOrContinue()
+    }
+
+    private fun requestPrimaryPermissionsOrContinue() {
+        val missing = requiredPrimaryPermissions().filterNot(::isPermissionGranted)
+        if (missing.isEmpty()) {
+            requestBackgroundPermissionOrStart()
+            return
+        }
+
+        pendingPermissionStage = PermissionStage.PRIMARY
         ActivityCompat.requestPermissions(
             this,
-            missingPermissions.toTypedArray(),
+            missing.toTypedArray(),
             SENSOR_PERMISSION_REQUEST,
         )
     }
 
-    private fun requiredRuntimePermissions(): List<String> {
-        val permissions = mutableListOf<String>()
+    private fun requestBackgroundPermissionOrStart() {
+        val permission = requiredBackgroundPermission()
+        if (permission == null || isPermissionGranted(permission)) {
+            completePermissionFlowAndStart()
+            return
+        }
 
+        pendingPermissionStage = PermissionStage.BACKGROUND
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(permission),
+            SENSOR_PERMISSION_REQUEST,
+        )
+    }
+
+    private fun requiredPrimaryPermissions(): List<String> = buildList {
         if (Build.VERSION.SDK_INT >= 36) {
-            permissions += READ_HEART_RATE_PERMISSION
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
-            permissions += Manifest.permission.BODY_SENSORS
+            add(READ_HEART_RATE_PERMISSION)
+        } else {
+            add(Manifest.permission.BODY_SENSORS)
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions += Manifest.permission.POST_NOTIFICATIONS
+            add(Manifest.permission.POST_NOTIFICATIONS)
         }
+    }
 
-        return permissions
+    private fun requiredBackgroundPermission(): String? = when {
+        Build.VERSION.SDK_INT >= 36 -> READ_HEALTH_DATA_IN_BACKGROUND_PERMISSION
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU ->
+            Manifest.permission.BODY_SENSORS_BACKGROUND
+        else -> null
+    }
+
+    private fun isPermissionGranted(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(this, permission) ==
+            PackageManager.PERMISSION_GRANTED
+
+    private fun completePermissionFlowAndStart() {
+        val result = pendingStartResult ?: return
+        pendingStartResult = null
+        pendingPermissionStage = null
+        startMonitoringService()
+        result.success(null)
+    }
+
+    private fun failPermissionFlow(stage: PermissionStage) {
+        val result = pendingStartResult ?: return
+        pendingStartResult = null
+        pendingPermissionStage = null
+        val code = when (stage) {
+            PermissionStage.PRIMARY -> "HEART_RATE_PERMISSION_DENIED"
+            PermissionStage.BACKGROUND -> "BACKGROUND_HEALTH_PERMISSION_DENIED"
+        }
+        val message = when (stage) {
+            PermissionStage.PRIMARY ->
+                "Heart-rate and notification permissions are required for monitoring."
+            PermissionStage.BACKGROUND ->
+                "All-day monitoring requires background health-data permission."
+        }
+        result.error(code, message, null)
     }
 
     private fun startMonitoringService() {
@@ -136,30 +197,27 @@ class MainActivity : FlutterActivity() {
         grantResults: IntArray,
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
         if (requestCode != SENSOR_PERMISSION_REQUEST) return
 
-        val result = pendingStartResult ?: return
-        pendingStartResult = null
-
+        val stage = pendingPermissionStage ?: return
         val allGranted = grantResults.isNotEmpty() &&
             grantResults.all { it == PackageManager.PERMISSION_GRANTED }
 
-        if (allGranted) {
-            startMonitoringService()
-            result.success(null)
-        } else {
-            result.error(
-                "SENSOR_PERMISSION_DENIED",
-                "Heart-rate and notification permissions are required for monitoring.",
-                null,
-            )
+        if (!allGranted) {
+            failPermissionFlow(stage)
+            return
+        }
+
+        when (stage) {
+            PermissionStage.PRIMARY -> requestBackgroundPermissionOrStart()
+            PermissionStage.BACKGROUND -> completePermissionFlowAndStart()
         }
     }
 
     override fun onDestroy() {
         NativeSensorForegroundService.eventSink = null
         pendingStartResult = null
+        pendingPermissionStage = null
         super.onDestroy()
     }
 }
