@@ -72,6 +72,9 @@ class NativeSensorForegroundService : Service() {
         if (persistence != null) {
             try {
                 persistedSnapshot = persistence.loadSnapshot()
+                persistedSnapshot?.let { snapshot ->
+                    epochClock.observe(snapshot.updatedAtEpochMs)
+                }
                 if (persistedSnapshot != null) {
                     machine = EscalationStateMachine.restorePersisted(
                         persisted = persistedSnapshot,
@@ -203,15 +206,18 @@ class NativeSensorForegroundService : Service() {
             monitoringActive = true
         }
 
-        publishEvent(
-            withSnapshot(
-                mapOf(
-                    "monitoring" to true,
-                    "eventType" to "MONITORING_STARTED",
-                    "timestamp" to epochClock.now(),
-                ),
-            ),
+        val monitoringEvent = mutableMapOf<String, Any>(
+            "monitoring" to true,
+            "eventType" to "MONITORING_STARTED",
+            "timestamp" to epochClock.now(),
         )
+        if (
+            escalationCoordinator.currentSnapshot().stage ==
+            EscalationStage.SAFETY_CHECK
+        ) {
+            monitoringEvent["safetyCheckRequired"] = true
+        }
+        publishEvent(withSnapshot(monitoringEvent))
     }
 
     private fun handleFallCandidateEvent(event: FallCandidateEvent): Boolean {
@@ -342,7 +348,7 @@ class NativeSensorForegroundService : Service() {
             transition is TransitionResult.Rejected &&
             transition.reason == "PERSISTENCE_UNAVAILABLE"
         ) {
-            persistenceHealthy = false
+            failClosedForPersistence()
         }
 
         val payload = extras.toMutableMap()
@@ -364,6 +370,15 @@ class NativeSensorForegroundService : Service() {
         }
 
         publishEvent(payload)
+    }
+
+    private fun failClosedForPersistence() {
+        persistenceHealthy = false
+        if (!monitoringActive) return
+
+        monitoringActive = false
+        healthSensorManager.stopMonitoring()
+        fallDetector.stop()
     }
 
     private fun withSnapshot(event: Map<String, Any>): Map<String, Any> =
