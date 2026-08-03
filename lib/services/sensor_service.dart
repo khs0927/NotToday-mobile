@@ -149,44 +149,59 @@ class SensorServiceBridge extends ChangeNotifier {
           _sensorAccuracy = accuracy.toInt();
         }
 
-        final Object? state = event['escalationState'];
-        if (state is String) {
-          _escalationState = state;
-        }
-
         final Object? sequence = event['escalationSequence'];
-        if (sequence is num) {
-          _escalationSequence = sequence.toInt();
-        }
+        final int? incomingSequence =
+            sequence is num ? sequence.toInt() : null;
+        final bool staleEscalationSnapshot = incomingSequence != null &&
+            incomingSequence < _escalationSequence;
 
-        final Object? reason = event['escalationReason'];
-        if (reason is String) {
-          _escalationReason = reason;
-        }
+        if (!staleEscalationSnapshot) {
+          const Set<String> allowedStates = <String>{
+            'NORMAL',
+            'RECHECK',
+            'SAFETY_CHECK',
+            'DIALER_READY',
+            'RESOLVED',
+          };
+          final Object? state = event['escalationState'];
+          if (state is String && allowedStates.contains(state)) {
+            _escalationState = state;
+          }
 
-        if (event.containsKey('activeCandidateId')) {
-          _activeCandidateId = event['activeCandidateId']?.toString();
-        } else if (_escalationState == 'NORMAL' ||
-            _escalationState == 'RESOLVED') {
-          _activeCandidateId = null;
-        }
+          if (incomingSequence != null && incomingSequence >= 0) {
+            _escalationSequence = incomingSequence;
+          }
 
-        if (event['safetyCheckRequired'] == true &&
-            _escalationSequence > _lastPromptedSequence) {
-          _lastPromptedSequence = _escalationSequence;
-          _collapseReason =
-              event['candidateReason']?.toString() ?? _escalationReason;
-          _alertSequence += 1;
-        } else if (_escalationState != 'SAFETY_CHECK') {
-          _collapseReason = null;
-        }
+          final Object? reason = event['escalationReason'];
+          if (reason is String) {
+            _escalationReason = reason;
+          }
 
-        if (event['transitionAccepted'] == false) {
-          final String eventType = event['eventType']?.toString() ?? '';
-          if (eventType.startsWith('DIALER_') ||
-              eventType == 'USER_CONFIRMED_SAFE') {
-            _lastError = event['transitionRejectionReason']?.toString() ??
-                'The requested safety transition was rejected.';
+          if (event.containsKey('activeCandidateId')) {
+            _activeCandidateId = event['activeCandidateId']?.toString();
+          } else if (_escalationState == 'NORMAL' ||
+              _escalationState == 'RESOLVED') {
+            _activeCandidateId = null;
+          }
+
+          if (event['safetyCheckRequired'] == true &&
+              _escalationState == 'SAFETY_CHECK' &&
+              _escalationSequence > _lastPromptedSequence) {
+            _lastPromptedSequence = _escalationSequence;
+            _collapseReason =
+                event['candidateReason']?.toString() ?? _escalationReason;
+            _alertSequence += 1;
+          } else if (_escalationState != 'SAFETY_CHECK') {
+            _collapseReason = null;
+          }
+
+          if (event['transitionAccepted'] == false) {
+            final String eventType = event['eventType']?.toString() ?? '';
+            if (eventType.startsWith('DIALER_') ||
+                eventType == 'USER_CONFIRMED_SAFE') {
+              _lastError = event['transitionRejectionReason']?.toString() ??
+                  'The requested safety transition was rejected.';
+            }
           }
         }
 
