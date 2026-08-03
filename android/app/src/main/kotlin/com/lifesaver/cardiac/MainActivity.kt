@@ -34,7 +34,13 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "confirmSafe" -> {
-                        dispatchServiceAction(NativeSensorForegroundService.ACTION_CONFIRM_SAFE)
+                        dispatchServiceAction(
+                            action = NativeSensorForegroundService.ACTION_CONFIRM_SAFE,
+                            extras = mapOf(
+                                NativeSensorForegroundService.EXTRA_CANDIDATE_ID to
+                                    call.argument<String>("candidateId").orEmpty(),
+                            ),
+                        )
                         result.success(null)
                     }
                     "openEmergencyDialer" -> {
@@ -47,6 +53,8 @@ class MainActivity : FlutterActivity() {
                             action = NativeSensorForegroundService.ACTION_REQUEST_DIALER,
                             extras = mapOf(
                                 NativeSensorForegroundService.EXTRA_DIALER_SOURCE to source,
+                                NativeSensorForegroundService.EXTRA_CANDIDATE_ID to
+                                    call.argument<String>("candidateId").orEmpty(),
                             ),
                         )
                         result.success(null)
