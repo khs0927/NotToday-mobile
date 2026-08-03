@@ -26,6 +26,8 @@ class NativeSensorForegroundService : Service() {
     private lateinit var emergencyController: EmergencyDispatchController
     private lateinit var escalationCoordinator: EscalationCoordinator
     private lateinit var epochClock: MonotonicEpochClock
+    private var escalationPersistence: RoomEscalationPersistence? = null
+    private var persistenceHealthy = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private var monitoringActive = false
 
@@ -54,7 +56,48 @@ class NativeSensorForegroundService : Service() {
 
         epochClock = MonotonicEpochClock()
         emergencyController = EmergencyDispatchController(this)
-        escalationCoordinator = EscalationCoordinator()
+
+        val persistence = runCatching {
+            RoomEscalationPersistence.open(applicationContext)
+        }.getOrNull()
+        escalationPersistence = persistence
+
+        var machine = EscalationStateMachine(
+            initialTimestampEpochMs = epochClock.now(),
+        )
+        var persistedSnapshot: EscalationSnapshot? = null
+        if (persistence != null) {
+            try {
+                persistedSnapshot = persistence.loadSnapshot()
+                if (persistedSnapshot != null) {
+                    machine = EscalationStateMachine.restorePersisted(
+                        persisted = persistedSnapshot,
+                        restoredAtEpochMs = epochClock.now(),
+                    )
+                }
+                check(persistence.initialize(machine.currentSnapshot())) {
+                    "INITIALIZE_FAILED"
+                }
+                if (
+                    persistedSnapshot != null &&
+                    !persistence.persistRestartNormalization(
+                        previous = persistedSnapshot,
+                        current = machine.currentSnapshot(),
+                        occurredAtEpochMs = epochClock.now(),
+                    )
+                ) {
+                    error("RESTART_NORMALIZATION_FAILED")
+                }
+                persistenceHealthy = true
+            } catch (exception: RuntimeException) {
+                Log.e(TAG, "Escalation persistence is unavailable.", exception)
+            }
+        }
+
+        escalationCoordinator = EscalationCoordinator(
+            machine = machine,
+            persistence = persistence.takeIf { persistenceHealthy },
+        )
 
         healthSensorManager = WearOSHealthSensorManager(this) { telemetry ->
             publishEvent(withSnapshot(telemetry))
@@ -76,13 +119,25 @@ class NativeSensorForegroundService : Service() {
         when (intent?.action ?: ACTION_START_MONITORING) {
             ACTION_CONFIRM_SAFE -> {
                 val candidateId = intent?.getStringExtra(EXTRA_CANDIDATE_ID).orEmpty()
-                publishTransition(
-                    escalationCoordinator.confirmSafe(
-                        candidateId = candidateId,
-                        occurredAtEpochMs = epochClock.now(),
-                    ),
-                    eventType = "USER_CONFIRMED_SAFE",
-                )
+                if (!persistenceHealthy) {
+                    publishEvent(
+                        withSnapshot(
+                            mapOf(
+                                "monitoring" to monitoringActive,
+                                "eventType" to "PERSISTENCE_UNAVAILABLE",
+                                "timestamp" to epochClock.now(),
+                            ),
+                        ),
+                    )
+                } else {
+                    publishTransition(
+                        escalationCoordinator.confirmSafe(
+                            candidateId = candidateId,
+                            occurredAtEpochMs = epochClock.now(),
+                        ),
+                        eventType = "USER_CONFIRMED_SAFE",
+                    )
+                }
                 stopIfActionStartedWithoutMonitoring(startId)
             }
 
@@ -110,6 +165,7 @@ class NativeSensorForegroundService : Service() {
             fallDetector.stop()
         }
         monitoringActive = false
+        escalationPersistence?.close()
         publishEvent(
             withSnapshot(
                 mapOf(
@@ -125,6 +181,19 @@ class NativeSensorForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startMonitoring() {
+        if (!persistenceHealthy) {
+            publishEvent(
+                withSnapshot(
+                    mapOf(
+                        "monitoring" to false,
+                        "eventType" to "PERSISTENCE_UNAVAILABLE",
+                        "timestamp" to epochClock.now(),
+                    ),
+                ),
+            )
+            return
+        }
+
         if (!monitoringActive) {
             healthSensorManager.startMonitoring()
             fallDetector.start()
@@ -143,6 +212,22 @@ class NativeSensorForegroundService : Service() {
     }
 
     private fun handleFallCandidateEvent(event: FallCandidateEvent): Boolean {
+        if (!persistenceHealthy) {
+            publishEvent(
+                withSnapshot(
+                    mapOf(
+                        "monitoring" to monitoringActive,
+                        "eventType" to "PERSISTENCE_UNAVAILABLE",
+                        "candidateId" to event.candidateId,
+                        "candidateLifecycle" to "REJECTED",
+                        "candidateReason" to "PERSISTENCE_UNAVAILABLE",
+                        "timestamp" to epochClock.now(),
+                    ),
+                ),
+            )
+            return false
+        }
+
         val transition = escalationCoordinator.handleFallCandidate(event)
         val extras = mutableMapOf<String, Any>(
             "candidateLifecycle" to when (event) {
@@ -193,6 +278,19 @@ class NativeSensorForegroundService : Service() {
         source: DialerRequestSource,
         candidateId: String,
     ) {
+        if (!persistenceHealthy) {
+            publishEvent(
+                withSnapshot(
+                    mapOf(
+                        "monitoring" to monitoringActive,
+                        "eventType" to "PERSISTENCE_UNAVAILABLE",
+                        "timestamp" to epochClock.now(),
+                    ),
+                ),
+            )
+            return
+        }
+
         val requestTransition = escalationCoordinator.requestDialer(
             candidateId = candidateId,
             source = source,
