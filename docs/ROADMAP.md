@@ -30,6 +30,7 @@
 - [x] 패키지명·SDK·Wear 기능·금지 권한 CI 검사
 - [x] debug 키를 release signing에서 제거
 - [x] 로컬 설치 절차 작성
+- [x] 의존성에서 병합된 WAKE_LOCK 권한 제거
 - [ ] 표준 `gradlew` 스크립트와 wrapper JAR 저장소 포함 여부 확정
 - [ ] 서로 다른 개발자 환경 3곳에서 로컬 빌드 성공
 - [ ] Wear OS 실기기 설치 성공
