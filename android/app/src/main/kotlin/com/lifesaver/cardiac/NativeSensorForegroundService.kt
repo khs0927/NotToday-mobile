@@ -338,6 +338,13 @@ class NativeSensorForegroundService : Service() {
         eventType: String,
         extras: Map<String, Any> = emptyMap(),
     ) {
+        if (
+            transition is TransitionResult.Rejected &&
+            transition.reason == "PERSISTENCE_UNAVAILABLE"
+        ) {
+            persistenceHealthy = false
+        }
+
         val payload = extras.toMutableMap()
         payload["eventType"] = eventType
         payload["monitoring"] = monitoringActive
