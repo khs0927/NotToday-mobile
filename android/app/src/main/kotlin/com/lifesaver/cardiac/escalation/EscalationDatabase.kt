@@ -17,6 +17,9 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
+private const val MAX_PERSISTED_CANDIDATE_ID_LENGTH = 96
+private const val MAX_PERSISTED_REASON_LENGTH = 240
+
 @Entity(tableName = "escalation_snapshot")
 data class EscalationSnapshotEntity(
     @PrimaryKey val singletonId: Int = 1,
@@ -52,6 +55,9 @@ data class EscalationEventEntity(
 interface EscalationDao {
     @Query("SELECT * FROM escalation_snapshot WHERE singletonId = 1 LIMIT 1")
     fun loadSnapshot(): EscalationSnapshotEntity?
+
+    @Query("SELECT COUNT(*) FROM escalation_event")
+    fun countEvents(): Long
 
     @Query("SELECT COALESCE(MAX(appendOrder), 0) + 1 FROM escalation_event")
     fun nextAppendOrder(): Long
@@ -114,6 +120,9 @@ class RoomEscalationPersistence private constructor(
             runOnDatabase {
                 database.runInTransaction {
                     if (dao.loadSnapshot() == null) {
+                        check(dao.countEvents() == 0L) {
+                            "Snapshot missing while the escalation event log is not empty."
+                        }
                         dao.upsertSnapshot(snapshot.toEntity(lastAppendOrder = 0L))
                     }
                 }
@@ -165,9 +174,9 @@ class RoomEscalationPersistence private constructor(
                             stageAfter = current.stage.name,
                             sequenceBefore = previous.sequence,
                             sequenceAfter = current.sequence,
-                            candidateId = current.activeCandidateId,
+                            candidateId = current.activeCandidateId?.take(MAX_PERSISTED_CANDIDATE_ID_LENGTH),
                             source = null,
-                            reason = current.reason,
+                            reason = current.reason.take(MAX_PERSISTED_REASON_LENGTH),
                             transitionAccepted = true,
                             transitionRejectionReason = null,
                             synthetic = true,
@@ -263,11 +272,11 @@ private fun TransitionResult.toEntity(
         stageAfter = after.stage.name,
         sequenceBefore = before.sequence,
         sequenceAfter = after.sequence,
-        candidateId = event.candidateIdOrNull(),
+        candidateId = event.candidateIdOrNull()?.take(MAX_PERSISTED_CANDIDATE_ID_LENGTH),
         source = event.sourceOrNull(),
-        reason = event.reasonOrDefault(),
+        reason = event.reasonOrDefault().take(MAX_PERSISTED_REASON_LENGTH),
         transitionAccepted = this is TransitionResult.Accepted,
-        transitionRejectionReason = (this as? TransitionResult.Rejected)?.reason,
+        transitionRejectionReason = (this as? TransitionResult.Rejected)?.reason?.take(MAX_PERSISTED_REASON_LENGTH),
         synthetic = false,
     )
 }
