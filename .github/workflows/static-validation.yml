@@ -105,7 +105,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          sdkmanager_path="$(find "$sdk_root/cmdline-tools" -type f -name sdkmanager -perm -111 2>/dev/null | head -n 1)"
+          test -n "$sdkmanager_path" || {
+            echo "sdkmanager was not found under $sdk_root/cmdline-tools"
+            find "$sdk_root" -maxdepth 4 -type f -name sdkmanager -print || true
+            exit 1
+          }
+          "$sdkmanager_path" "platforms;android-36" "build-tools;36.0.0" >/dev/null
 
       - name: Print pinned tool versions
         shell: bash
