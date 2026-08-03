@@ -4,16 +4,14 @@
 
 ## 고정 빌드 환경
 
-| 항목 | 값 |
-|---|---|
-| Flutter | 3.44.8 |
-| Dart | 3.12.2 |
-| JDK | 17 |
-| Gradle | 9.1.0 |
-| AGP | 9.0.1 |
-| Kotlin | 2.3.20 |
-| compileSdk / targetSdk | 36 / 36 |
-| minSdk | 30 |
+- Flutter 3.44.8
+- Dart 3.12.2
+- JDK 17
+- Gradle 9.1.0
+- AGP 9.0.1
+- Kotlin 2.3.20
+- compileSdk / targetSdk 36 / 36
+- minSdk 30
 
 ## 로컬 빌드
 
@@ -23,12 +21,6 @@ flutter pub get
 dart format --output=none lib
 flutter analyze --no-fatal-infos --no-fatal-warnings
 flutter build apk --debug --no-pub
-```
-
-APK 위치:
-
-```text
-build/app/outputs/flutter-apk/app-debug.apk
 ```
 
 ## Wear OS 설치
