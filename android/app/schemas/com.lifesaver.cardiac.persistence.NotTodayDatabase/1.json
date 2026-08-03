@@ -8,38 +8,162 @@
         "tableName": "escalation_snapshot",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`singletonId` INTEGER NOT NULL, `stage` TEXT NOT NULL, `sequence` INTEGER NOT NULL, `activeCandidateId` TEXT, `stageEnteredAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, `reason` TEXT NOT NULL, `cooldownUntilEpochMs` INTEGER, PRIMARY KEY(`singletonId`))",
         "fields": [
-          {"fieldPath":"singletonId","columnName":"singletonId","affinity":"INTEGER","notNull":true},
-          {"fieldPath":"stage","columnName":"stage","affinity":"TEXT","notNull":true},
-          {"fieldPath":"sequence","columnName":"sequence","affinity":"INTEGER","notNull":true},
-          {"fieldPath":"activeCandidateId","columnName":"activeCandidateId","affinity":"TEXT"},
-          {"fieldPath":"stageEnteredAtEpochMs","columnName":"stageEnteredAtEpochMs","affinity":"INTEGER","notNull":true},
-          {"fieldPath":"updatedAtEpochMs","columnName":"updatedAtEpochMs","affinity":"INTEGER","notNull":true},
-          {"fieldPath":"reason","columnName":"reason","affinity":"TEXT","notNull":true},
-          {"fieldPath":"cooldownUntilEpochMs","columnName":"cooldownUntilEpochMs","affinity":"INTEGER"}
+          {
+            "fieldPath": "singletonId",
+            "columnName": "singletonId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stage",
+            "columnName": "stage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sequence",
+            "columnName": "sequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "activeCandidateId",
+            "columnName": "activeCandidateId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "stageEnteredAtEpochMs",
+            "columnName": "stageEnteredAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cooldownUntilEpochMs",
+            "columnName": "cooldownUntilEpochMs",
+            "affinity": "INTEGER"
+          }
         ],
-        "primaryKey": {"autoGenerate":false,"columnNames":["singletonId"]}
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "singletonId"
+          ]
+        }
       },
       {
         "tableName": "escalation_transition",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `eventType` TEXT NOT NULL, `occurredAtEpochMs` INTEGER NOT NULL, `candidateId` TEXT, `eventReason` TEXT, `accepted` INTEGER NOT NULL, `rejectionReason` TEXT, `previousStage` TEXT NOT NULL, `currentStage` TEXT NOT NULL, `currentSequence` INTEGER NOT NULL, `currentReason` TEXT NOT NULL)",
         "fields": [
-          {"fieldPath":"id","columnName":"id","affinity":"INTEGER","notNull":true},
-          {"fieldPath":"eventType","columnName":"eventType","affinity":"TEXT","notNull":true},
-          {"fieldPath":"occurredAtEpochMs","columnName":"occurredAtEpochMs","affinity":"INTEGER","notNull":true},
-          {"fieldPath":"candidateId","columnName":"candidateId","affinity":"TEXT"},
-          {"fieldPath":"eventReason","columnName":"eventReason","affinity":"TEXT"},
-          {"fieldPath":"accepted","columnName":"accepted","affinity":"INTEGER","notNull":true},
-          {"fieldPath":"rejectionReason","columnName":"rejectionReason","affinity":"TEXT"},
-          {"fieldPath":"previousStage","columnName":"previousStage","affinity":"TEXT","notNull":true},
-          {"fieldPath":"currentStage","columnName":"currentStage","affinity":"TEXT","notNull":true},
-          {"fieldPath":"currentSequence","columnName":"currentSequence","affinity":"INTEGER","notNull":true},
-          {"fieldPath":"currentReason","columnName":"currentReason","affinity":"TEXT","notNull":true}
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventType",
+            "columnName": "eventType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "occurredAtEpochMs",
+            "columnName": "occurredAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateId",
+            "columnName": "candidateId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "eventReason",
+            "columnName": "eventReason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "accepted",
+            "columnName": "accepted",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rejectionReason",
+            "columnName": "rejectionReason",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "previousStage",
+            "columnName": "previousStage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentStage",
+            "columnName": "currentStage",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentSequence",
+            "columnName": "currentSequence",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currentReason",
+            "columnName": "currentReason",
+            "affinity": "TEXT",
+            "notNull": true
+          }
         ],
-        "primaryKey": {"autoGenerate":true,"columnNames":["id"]},
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
         "indices": [
-          {"name":"index_escalation_transition_occurredAtEpochMs","unique":false,"columnNames":["occurredAtEpochMs"],"orders":[],"createSql":"CREATE INDEX IF NOT EXISTS `index_escalation_transition_occurredAtEpochMs` ON `${TABLE_NAME}` (`occurredAtEpochMs`)"},
-          {"name":"index_escalation_transition_candidateId","unique":false,"columnNames":["candidateId"],"orders":[],"createSql":"CREATE INDEX IF NOT EXISTS `index_escalation_transition_candidateId` ON `${TABLE_NAME}` (`candidateId`)"},
-          {"name":"index_escalation_transition_accepted","unique":false,"columnNames":["accepted"],"orders":[],"createSql":"CREATE INDEX IF NOT EXISTS `index_escalation_transition_accepted` ON `${TABLE_NAME}` (`accepted`)"}
+          {
+            "name": "index_escalation_transition_occurredAtEpochMs",
+            "unique": false,
+            "columnNames": [
+              "occurredAtEpochMs"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_escalation_transition_occurredAtEpochMs` ON `${TABLE_NAME}` (`occurredAtEpochMs`)"
+          },
+          {
+            "name": "index_escalation_transition_candidateId",
+            "unique": false,
+            "columnNames": [
+              "candidateId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_escalation_transition_candidateId` ON `${TABLE_NAME}` (`candidateId`)"
+          },
+          {
+            "name": "index_escalation_transition_accepted",
+            "unique": false,
+            "columnNames": [
+              "accepted"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_escalation_transition_accepted` ON `${TABLE_NAME}` (`accepted`)"
+          }
         ]
       }
     ],
