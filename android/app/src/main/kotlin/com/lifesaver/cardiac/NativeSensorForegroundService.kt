@@ -57,7 +57,10 @@ class NativeSensorForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = createNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
+        // The health foreground-service type was introduced in Android 14.
+        // Older Wear OS versions must use the two-argument overload.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
                 NOTIFICATION_ID,
                 notification,
@@ -120,6 +123,8 @@ class NativeSensorForegroundService : Service() {
             .setContentText("Heart-rate and fall-candidate monitoring is running")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
+            .setCategory(NotificationCompat.CATEGORY_SERVICE)
+            .setOnlyAlertOnce(true)
             .build()
     }
 }
