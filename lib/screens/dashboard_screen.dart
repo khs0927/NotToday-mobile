@@ -204,7 +204,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       statusText = 'Safety Check';
     } else if (stage == 4) {
       badgeColor = Colors.red;
-      statusText = 'Dialer Opened';
+      statusText = 'Dialer Ready';
+    } else if (stage == 5) {
+      badgeColor = Colors.blue;
+      statusText = 'Resolved';
     }
 
     return Container(

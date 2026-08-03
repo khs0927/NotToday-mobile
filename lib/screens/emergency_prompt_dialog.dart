@@ -49,7 +49,7 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
     _timer = Timer.periodic(const Duration(seconds: 1), (Timer timer) {
       if (_countdown <= 1) {
         timer.cancel();
-        unawaited(_openDialerAndClose());
+        unawaited(_openDialerAndClose(timedOut: true));
         return;
       }
 
@@ -68,18 +68,25 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
     await Vibration.cancel();
 
     if (!mounted) return;
-    context.read<SensorServiceBridge>().acknowledgeAlert();
-    Navigator.of(context).pop();
+    final SensorServiceBridge bridge = context.read<SensorServiceBridge>();
+    await bridge.acknowledgeAlert(candidateId: bridge.activeCandidateId);
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
-  Future<void> _openDialerAndClose() async {
+  Future<void> _openDialerAndClose({bool timedOut = false}) async {
     if (_isCompleting) return;
     _isCompleting = true;
     _timer?.cancel();
     await Vibration.cancel();
 
     if (!mounted) return;
-    await context.read<SensorServiceBridge>().openEmergencyDialer();
+    final SensorServiceBridge bridge = context.read<SensorServiceBridge>();
+    await bridge.openEmergencyDialer(
+      timedOut: timedOut,
+      candidateId: bridge.activeCandidateId,
+    );
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -145,7 +152,7 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
           ),
           const SizedBox(height: 4),
           const Text(
-            '응답이 없으면 119 전화 화면을 엽니다. 통화는 자동 연결되지 않습니다.',
+            '응답이 없으면 상태 머신에 다이얼러 요청을 전달합니다. 통화는 자동 연결되지 않습니다.',
             style: TextStyle(color: Colors.grey, fontSize: 9),
             textAlign: TextAlign.center,
           ),
@@ -158,7 +165,7 @@ class _EmergencyPromptDialogState extends State<EmergencyPromptDialog> {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.redAccent,
             ),
-            onPressed: _openDialerAndClose,
+            onPressed: () => _openDialerAndClose(),
             child: const Text('119 전화 화면 열기'),
           ),
         ),

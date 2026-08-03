@@ -33,13 +33,31 @@ class MainActivity : FlutterActivity() {
                         stopService(Intent(this, NativeSensorForegroundService::class.java))
                         result.success(null)
                     }
+                    "confirmSafe" -> {
+                        dispatchServiceAction(
+                            action = NativeSensorForegroundService.ACTION_CONFIRM_SAFE,
+                            extras = mapOf(
+                                NativeSensorForegroundService.EXTRA_CANDIDATE_ID to
+                                    call.argument<String>("candidateId").orEmpty(),
+                            ),
+                        )
+                        result.success(null)
+                    }
                     "openEmergencyDialer" -> {
-                        val opened = EmergencyDispatchController(this).openSystemEmergencyDialer()
-                        if (opened) {
-                            result.success(null)
-                        } else {
-                            result.error("DIALER_UNAVAILABLE", "Unable to open the emergency dialer.", null)
+                        val source = when (call.argument<String>("source")) {
+                            NativeSensorForegroundService.DIALER_SOURCE_PROMPT_TIMEOUT ->
+                                NativeSensorForegroundService.DIALER_SOURCE_PROMPT_TIMEOUT
+                            else -> NativeSensorForegroundService.DIALER_SOURCE_USER
                         }
+                        dispatchServiceAction(
+                            action = NativeSensorForegroundService.ACTION_REQUEST_DIALER,
+                            extras = mapOf(
+                                NativeSensorForegroundService.EXTRA_DIALER_SOURCE to source,
+                                NativeSensorForegroundService.EXTRA_CANDIDATE_ID to
+                                    call.argument<String>("candidateId").orEmpty(),
+                            ),
+                        )
+                        result.success(null)
                     }
                     else -> result.notImplemented()
                 }
@@ -98,7 +116,17 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun startMonitoringService() {
-        val serviceIntent = Intent(this, NativeSensorForegroundService::class.java)
+        dispatchServiceAction(NativeSensorForegroundService.ACTION_START_MONITORING)
+    }
+
+    private fun dispatchServiceAction(
+        action: String,
+        extras: Map<String, String> = emptyMap(),
+    ) {
+        val serviceIntent = Intent(this, NativeSensorForegroundService::class.java).apply {
+            this.action = action
+            extras.forEach { (key, value) -> putExtra(key, value) }
+        }
         ContextCompat.startForegroundService(this, serviceIntent)
     }
 
