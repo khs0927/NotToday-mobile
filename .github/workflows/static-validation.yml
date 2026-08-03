@@ -148,11 +148,10 @@ jobs:
       - name: Run Room persistence instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
-          target: google_apis
+          api-level: 30
+          target: default
           arch: x86_64
           profile: pixel_2
-          force-avd-creation: true
           disable-animations: true
           script: |
             cd android
