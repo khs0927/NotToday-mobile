@@ -102,11 +102,22 @@ class RoomEscalationPersistence private constructor(
         private const val TAG = "EscalationPersistence"
         private const val DATABASE_NAME = "escalation_state.db"
 
-        fun open(context: Context): RoomEscalationPersistence {
+        fun open(context: Context): RoomEscalationPersistence =
+            open(context, DATABASE_NAME)
+
+        /**
+         * Opens a named database for controlled persistence/restart tests.
+         * Production callers use the default fixed name above.
+         */
+        fun open(
+            context: Context,
+            databaseName: String,
+        ): RoomEscalationPersistence {
+            require(databaseName.isNotBlank()) { "databaseName must not be blank" }
             val database = Room.databaseBuilder(
                 context.applicationContext,
                 EscalationDatabase::class.java,
-                DATABASE_NAME,
+                databaseName,
             ).build()
             return RoomEscalationPersistence(database)
         }
