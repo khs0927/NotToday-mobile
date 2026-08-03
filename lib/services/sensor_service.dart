@@ -83,10 +83,15 @@ class SensorServiceBridge extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> acknowledgeAlert() async {
+  Future<void> acknowledgeAlert({String? candidateId}) async {
     _lastError = null;
     try {
-      await _methodChannel.invokeMethod<void>('confirmSafe');
+      await _methodChannel.invokeMethod<void>(
+        'confirmSafe',
+        <String, String>{
+          'candidateId': candidateId ?? '',
+        },
+      );
     } on PlatformException catch (error) {
       _lastError = error.message ?? error.code;
       debugPrint('Failed to confirm the safety prompt: $error');
@@ -94,13 +99,17 @@ class SensorServiceBridge extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> openEmergencyDialer({required bool timedOut}) async {
+  Future<void> openEmergencyDialer({
+    required bool timedOut,
+    String? candidateId,
+  }) async {
     _lastError = null;
     try {
       await _methodChannel.invokeMethod<void>(
         'openEmergencyDialer',
         <String, String>{
           'source': timedOut ? 'PROMPT_TIMEOUT' : 'USER',
+          'candidateId': candidateId ?? '',
         },
       );
     } on PlatformException catch (error) {
