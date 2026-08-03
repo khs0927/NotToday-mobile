@@ -8,7 +8,7 @@ import 'services/sensor_service.dart';
 void main() {
   runApp(
     MultiProvider(
-      providers: <SingleChildWidget>[
+      providers: [
         ChangeNotifierProvider<SensorServiceBridge>(
           create: (_) => SensorServiceBridge(),
         ),
