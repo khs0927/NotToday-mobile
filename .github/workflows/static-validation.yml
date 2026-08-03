@@ -1,0 +1,178 @@
+name: Android safety baseline
+
+on:
+  push:
+    branches:
+      - main
+      - 'agent/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-static-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify safety baseline files
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_files=(
+            "pubspec.yaml"
+            "lib/main.dart"
+            "lib/services/sensor_service.dart"
+            "android/settings.gradle.kts"
+            "android/build.gradle.kts"
+            "android/app/build.gradle.kts"
+            "android/gradle/wrapper/gradle-wrapper.properties"
+            "android/app/src/main/AndroidManifest.xml"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/MainActivity.kt"
+            "docs/BUILD.md"
+            "docs/SAFETY_MODEL.md"
+            "docs/TEST_PLAN.md"
+          )
+
+          for path in "${required_files[@]}"; do
+            test -f "$path" || {
+              echo "Missing required file: $path"
+              exit 1
+            }
+          done
+
+      - name: Reject prohibited prototype behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n -E \
+            'sendTextMessage|android.permission.SEND_SMS|35\.1796|129\.0756' \
+            lib android; then
+            echo "Prohibited automatic SMS or hard-coded location behavior found."
+            exit 1
+          fi
+
+          if grep -R -n -E \
+            'android.permission.CALL_PHONE|Intent\.ACTION_CALL' \
+            lib android; then
+            echo "Prohibited automatic-call capability found."
+            exit 1
+          fi
+
+      - name: Set up Flutter 3.44.8
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+
+      - name: Resolve Dart dependencies
+        run: flutter pub get
+
+      - name: Parse and normalize Dart sources
+        run: dart format --output=none lib
+
+      - name: Analyze Flutter sources
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+  android-debug-build:
+    needs: flutter-static-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter 3.44.8
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+
+      - name: Install Android API 36 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          sdkmanager_path="$(find "$sdk_root/cmdline-tools" -type f -name sdkmanager -perm -111 2>/dev/null | head -n 1)"
+          test -n "$sdkmanager_path" || {
+            echo "sdkmanager was not found under $sdk_root/cmdline-tools"
+            find "$sdk_root" -maxdepth 4 -type f -name sdkmanager -print || true
+            exit 1
+          }
+          "$sdkmanager_path" "platforms;android-36" "build-tools;36.0.0" >/dev/null
+
+      - name: Print pinned tool versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -version
+          flutter --version
+          flutter doctor -v
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug --no-pub
+
+      - name: Verify APK and create checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$apk"
+          sha256sum "$apk" | tee build/app-debug.apk.sha256
+          ls -lh "$apk" build/app-debug.apk.sha256
+
+      - name: Inspect packaged manifest and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-debug.apk"
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          aapt_path="$(find "$sdk_root/build-tools" -type f -name aapt -perm -111 2>/dev/null | sort -V | tail -n 1)"
+          test -n "$aapt_path" || {
+            echo "aapt was not found under $sdk_root/build-tools"
+            exit 1
+          }
+
+          "$aapt_path" dump badging "$apk" | tee build/app-debug.badging.txt
+          "$aapt_path" dump permissions "$apk" | tee build/app-debug.permissions.txt
+
+          grep -q "package: name='com.lifesaver.cardiac.debug'" build/app-debug.badging.txt
+          grep -q "sdkVersion:'30'" build/app-debug.badging.txt
+          grep -q "targetSdkVersion:'36'" build/app-debug.badging.txt
+          grep -q "uses-feature: name='android.hardware.type.watch'" build/app-debug.badging.txt
+
+          if grep -E \
+            'android.permission.(SEND_SMS|CALL_PHONE|ACCESS_FINE_LOCATION|ACCESS_COARSE_LOCATION|WAKE_LOCK)' \
+            build/app-debug.permissions.txt; then
+            echo "A packaged APK contains a prohibited permission."
+            exit 1
+          fi
+
+      - name: Upload debug APK evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nottoday-wear-debug-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/app-debug.apk
+            build/app-debug.apk.sha256
+            build/app-debug.badging.txt
+            build/app-debug.permissions.txt
+          if-no-files-found: error
+          retention-days: 14
