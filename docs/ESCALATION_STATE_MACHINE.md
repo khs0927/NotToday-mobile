@@ -72,7 +72,9 @@ Room은 현재 스냅샷과 append-only 전이 감사 로그를 별도 테이블
 - `escalation_event`: 모든 허용·거부 전이를 append order로 기록합니다. 거부 이벤트도 `transitionAccepted=false`와 rejection reason을 남깁니다.
 - 이벤트와 결과 스냅샷은 하나의 Room transaction에서 함께 기록합니다.
 - `sequence`는 성공한 상태 전이에만 증가하고, `appendOrder`는 거부 이벤트를 포함한 모든 저장 이벤트마다 증가합니다.
-- 데이터베이스 오류·손상·복구 실패 시 `PERSISTENCE_UNAVAILABLE`로 fail-closed 하며 새 후보 측정과 다이얼러 부수 효과를 진행하지 않습니다.
+- 데이터베이스 오류·손상·복구 실패 시 `PERSISTENCE_UNAVAILABLE`로 fail-closed 하며 새 후보 측정과 다이얼러 부수 효과를 진행하지 않습니다. 이벤트 로그만 남고 singleton snapshot이 없는 부분 손상도 새 `NORMAL` 상태로 덮어쓰지 않습니다.
+- 런타임 저장 실패가 발생하면 서비스는 persistence를 unhealthy로 전환해 이후 모니터링·후보 측정·다이얼러 요청을 중단합니다.
+- 감사 사유는 최대 240자, 후보 ID는 최대 96자로 저장 경계에서 제한합니다.
 - 프로세스 재시작 시 `RECHECK`와 `DIALER_READY`는 안전한 상태로 정규화하고 `PROCESS_RESTART_NORMALIZED` synthetic event를 기록합니다. 이벤트 로그를 재생해 외부 부수 효과를 다시 실행하지 않습니다.
 - 원시 IMU·심박 샘플, 지속 심박값, 위치, 전화번호, SMS 내용은 저장하지 않습니다.
 - Room schema는 `android/app/schemas`로 export하며 destructive migration은 사용하지 않습니다.
