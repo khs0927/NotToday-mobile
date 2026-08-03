@@ -25,6 +25,7 @@ class NativeSensorForegroundService : Service() {
     private lateinit var fallDetector: IMUFallCollapseDetector
     private lateinit var emergencyController: EmergencyDispatchController
     private lateinit var escalationCoordinator: EscalationCoordinator
+    private lateinit var epochClock: MonotonicEpochClock
     private val mainHandler = Handler(Looper.getMainLooper())
     private var monitoringActive = false
 
@@ -40,6 +41,7 @@ class NativeSensorForegroundService : Service() {
         const val ACTION_REQUEST_DIALER =
             "com.lifesaver.cardiac.action.REQUEST_DIALER"
         const val EXTRA_DIALER_SOURCE = "dialer_source"
+        const val EXTRA_CANDIDATE_ID = "candidate_id"
         const val DIALER_SOURCE_USER = "USER"
         const val DIALER_SOURCE_PROMPT_TIMEOUT = "PROMPT_TIMEOUT"
 
@@ -50,6 +52,7 @@ class NativeSensorForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
 
+        epochClock = MonotonicEpochClock()
         emergencyController = EmergencyDispatchController(this)
         escalationCoordinator = EscalationCoordinator()
 
@@ -63,6 +66,7 @@ class NativeSensorForegroundService : Service() {
                 healthSensorManager.hasRecentValidHeartRate()
             },
             onCandidateEvent = ::handleFallCandidateEvent,
+            nowEpochMs = epochClock::now,
         )
     }
 
@@ -71,8 +75,12 @@ class NativeSensorForegroundService : Service() {
 
         when (intent?.action ?: ACTION_START_MONITORING) {
             ACTION_CONFIRM_SAFE -> {
+                val candidateId = intent?.getStringExtra(EXTRA_CANDIDATE_ID).orEmpty()
                 publishTransition(
-                    escalationCoordinator.confirmSafe(System.currentTimeMillis()),
+                    escalationCoordinator.confirmSafe(
+                        candidateId = candidateId,
+                        occurredAtEpochMs = epochClock.now(),
+                    ),
                     eventType = "USER_CONFIRMED_SAFE",
                 )
                 stopIfActionStartedWithoutMonitoring(startId)
@@ -83,7 +91,10 @@ class NativeSensorForegroundService : Service() {
                     DIALER_SOURCE_PROMPT_TIMEOUT -> DialerRequestSource.PROMPT_TIMEOUT
                     else -> DialerRequestSource.USER
                 }
-                handleDialerRequest(source)
+                handleDialerRequest(
+                    source = source,
+                    candidateId = intent?.getStringExtra(EXTRA_CANDIDATE_ID).orEmpty(),
+                )
                 stopIfActionStartedWithoutMonitoring(startId)
             }
 
@@ -104,7 +115,7 @@ class NativeSensorForegroundService : Service() {
                 mapOf(
                     "monitoring" to false,
                     "eventType" to "MONITORING_STOPPED",
-                    "timestamp" to System.currentTimeMillis(),
+                    "timestamp" to epochClock.now(),
                 ),
             ),
         )
@@ -125,7 +136,7 @@ class NativeSensorForegroundService : Service() {
                 mapOf(
                     "monitoring" to true,
                     "eventType" to "MONITORING_STARTED",
-                    "timestamp" to System.currentTimeMillis(),
+                    "timestamp" to epochClock.now(),
                 ),
             ),
         )
@@ -178,10 +189,14 @@ class NativeSensorForegroundService : Service() {
         return transition is TransitionResult.Accepted
     }
 
-    private fun handleDialerRequest(source: DialerRequestSource) {
+    private fun handleDialerRequest(
+        source: DialerRequestSource,
+        candidateId: String,
+    ) {
         val requestTransition = escalationCoordinator.requestDialer(
+            candidateId = candidateId,
             source = source,
-            occurredAtEpochMs = System.currentTimeMillis(),
+            occurredAtEpochMs = epochClock.now(),
         )
         publishTransition(
             transition = requestTransition,
@@ -196,12 +211,17 @@ class NativeSensorForegroundService : Service() {
         }
 
         val opened = emergencyController.openSystemEmergencyDialer()
+        val openedCandidateId = requestTransition.current.activeCandidateId ?: return
         val resultTransition = if (opened) {
-            escalationCoordinator.recordDialerOpened(System.currentTimeMillis())
+            escalationCoordinator.recordDialerOpened(
+                candidateId = openedCandidateId,
+                occurredAtEpochMs = epochClock.now(),
+            )
         } else {
             escalationCoordinator.recordDialerFailed(
+                candidateId = openedCandidateId,
                 reason = "DIALER_UNAVAILABLE",
-                occurredAtEpochMs = System.currentTimeMillis(),
+                occurredAtEpochMs = epochClock.now(),
             )
         }
 
@@ -220,7 +240,7 @@ class NativeSensorForegroundService : Service() {
         val payload = extras.toMutableMap()
         payload["eventType"] = eventType
         payload["monitoring"] = monitoringActive
-        payload["timestamp"] = System.currentTimeMillis()
+        payload["timestamp"] = epochClock.now()
 
         when (transition) {
             is TransitionResult.Accepted -> {
