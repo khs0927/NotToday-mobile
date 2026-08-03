@@ -210,8 +210,8 @@ class NativeSensorForegroundService : Service() {
             return
         }
 
-        val opened = emergencyController.openSystemEmergencyDialer()
         val openedCandidateId = requestTransition.current.activeCandidateId ?: return
+        val opened = emergencyController.openSystemEmergencyDialer()
         val resultTransition = if (opened) {
             escalationCoordinator.recordDialerOpened(
                 candidateId = openedCandidateId,
