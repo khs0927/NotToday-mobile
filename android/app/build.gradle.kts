@@ -50,7 +50,8 @@ kotlin {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.19.0")
+    // 1.17.0 is the API 36 line and matches Flutter 3.44.8 / AGP 9.0.1.
+    implementation("androidx.core:core-ktx:1.17.0")
 }
 
 flutter {
