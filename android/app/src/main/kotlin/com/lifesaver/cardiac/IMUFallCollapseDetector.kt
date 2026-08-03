@@ -149,17 +149,20 @@ class IMUFallCollapseDetector(
         postImpactSamples.clear()
 
         immobilityCheckRunnable?.let(mainHandler::removeCallbacks)
-        immobilityCheckRunnable = Runnable { evaluateImpactWindow() }
+        val scheduledCandidateId = candidateId
+        immobilityCheckRunnable = Runnable {
+            if (activeCandidateId == scheduledCandidateId) {
+                evaluateImpactWindow(scheduledCandidateId)
+            }
+        }
         mainHandler.postDelayed(immobilityCheckRunnable!!, IMMOBILITY_WINDOW_MS)
 
         Log.w(TAG, "Impact candidate accepted at ${"%.2f".format(gForce)} g.")
     }
 
-    private fun evaluateImpactWindow() {
-        val candidateId = activeCandidateId ?: run {
-            resetImpactWindow()
-            return
-        }
+    private fun evaluateImpactWindow(expectedCandidateId: String) {
+        if (activeCandidateId != expectedCandidateId || !isImpactDetected) return
+        val candidateId = expectedCandidateId
         val samples = postImpactSamples.toList()
         val hasEnoughSamples = samples.size >= MIN_SAMPLE_COUNT
         val wearerSignalPresent = isWearerSignalAvailable()
