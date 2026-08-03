@@ -1,4 +1,4 @@
-name: Static validation
+name: Android safety baseline
 
 on:
   push:
@@ -27,6 +27,10 @@ jobs:
             "pubspec.yaml"
             "lib/main.dart"
             "lib/services/sensor_service.dart"
+            "android/settings.gradle.kts"
+            "android/build.gradle.kts"
+            "android/app/build.gradle.kts"
+            "android/gradle/wrapper/gradle-wrapper.properties"
             "android/app/src/main/AndroidManifest.xml"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/MainActivity.kt"
             "docs/SAFETY_MODEL.md"
@@ -51,9 +55,17 @@ jobs:
             exit 1
           fi
 
-      - name: Set up Flutter
+          if grep -R -n -E \
+            'android.permission.CALL_PHONE|Intent\.ACTION_CALL' \
+            lib android; then
+            echo "Prohibited automatic-call capability found."
+            exit 1
+          fi
+
+      - name: Set up Flutter 3.44.8
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.44.8'
           channel: stable
           cache: true
 
@@ -61,7 +73,69 @@ jobs:
         run: flutter pub get
 
       - name: Parse and format-check Dart sources
-        run: dart format --output=none lib
+        run: dart format --output=none --set-exit-if-changed lib
 
       - name: Analyze Flutter sources
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+  android-debug-build:
+    needs: flutter-static-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter 3.44.8
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.8'
+          channel: stable
+          cache: true
+
+      - name: Install Android API 36 toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager "platforms;android-36" "build-tools;36.0.0" >/dev/null
+
+      - name: Print pinned tool versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -version
+          flutter --version
+          flutter doctor -v
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug --no-pub
+
+      - name: Verify APK and create checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="build/app/outputs/flutter-apk/app-debug.apk"
+          test -s "$apk"
+          sha256sum "$apk" | tee build/app-debug.apk.sha256
+          ls -lh "$apk" build/app-debug.apk.sha256
+
+      - name: Upload debug APK evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: nottoday-wear-debug-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/app-debug.apk
+            build/app-debug.apk.sha256
+          if-no-files-found: error
+          retention-days: 14
