@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class DisclaimerBanner extends StatelessWidget {
-  const DisclaimerBanner({Key? key}) : super(key: key);
+  const DisclaimerBanner({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +12,7 @@ class DisclaimerBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: const Text(
-        'Notice: Personal Safety & Risk Awareness Tool. Not a medical diagnostic device.',
+        '안전 보조 프로토타입입니다. 질환을 진단하거나 응급 구조를 보장하지 않습니다. 실제 응급 상황에서는 직접 119에 연락하세요.',
         style: TextStyle(color: Colors.grey, fontSize: 8),
         textAlign: TextAlign.center,
       ),
