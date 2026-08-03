@@ -363,11 +363,42 @@ class EscalationStateMachine private constructor(
                 "stageEnteredAtEpochMs must not exceed updatedAtEpochMs"
             }
             require(value.reason.isNotBlank()) { "reason must not be blank" }
-            if (value.stage == EscalationStage.NORMAL) {
-                require(value.activeCandidateId == null) {
-                    "NORMAL must not retain an active candidate"
+
+            when (value.stage) {
+                EscalationStage.NORMAL -> {
+                    require(value.activeCandidateId == null) {
+                        "NORMAL must not retain an active candidate"
+                    }
+                    require(value.cooldownUntilEpochMs == null) {
+                        "NORMAL must not retain a cooldown"
+                    }
+                }
+
+                EscalationStage.RECHECK,
+                EscalationStage.SAFETY_CHECK,
+                EscalationStage.DIALER_READY,
+                -> {
+                    require(value.activeCandidateId != null) {
+                        "${value.stage} must retain an active candidate"
+                    }
+                    require(value.cooldownUntilEpochMs == null) {
+                        "${value.stage} must not retain a cooldown"
+                    }
+                }
+
+                EscalationStage.RESOLVED -> {
+                    require(value.activeCandidateId == null) {
+                        "RESOLVED must not retain an active candidate"
+                    }
+                    val cooldownUntil = requireNotNull(value.cooldownUntilEpochMs) {
+                        "RESOLVED must retain a cooldown"
+                    }
+                    require(cooldownUntil >= value.updatedAtEpochMs) {
+                        "RESOLVED cooldown must not precede updatedAtEpochMs"
+                    }
                 }
             }
+
             if (value.activeCandidateId != null) {
                 require(isValidCandidateId(value.activeCandidateId)) {
                     "activeCandidateId is invalid"
