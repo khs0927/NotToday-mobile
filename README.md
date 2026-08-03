@@ -38,17 +38,29 @@ Wear OS에서 심박수와 충격 후 저활동 상태를 관찰하고, 사용�
 - `flutter analyze`
 - `flutter build apk --debug`
 - SHA-256 생성
+- APK 패키지 정보와 권한 검사
 - APK artifact 업로드
 
-최초 검증 APK:
+최종 검증 APK:
 
 ```text
 SHA-256
- e672ba85d2cc665b2294b835de575697c65cdf83c92b56116a8de6d7476d62a3
+476f232305fb29a81420ad9c9b496cd10c42c2ed4864bcb3164d5646e70e89e1
 
 크기
- 159,305,023 bytes — 약 152 MiB
+159,305,023 bytes — 약 152 MiB
 ```
+
+검증된 패키지:
+
+```text
+applicationId  com.lifesaver.cardiac.debug
+minSdk         30
+targetSdk      36
+Wear feature   android.hardware.type.watch
+```
+
+SMS, 자동 전화, 위치, WAKE_LOCK 권한은 최종 APK에 포함되지 않습니다.
 
 이 APK는 개발용 universal debug APK이며 배포용이 아닙니다. 자세한 환경과 설치 절차는 [`docs/BUILD.md`](docs/BUILD.md)를 따릅니다.
 
@@ -119,6 +131,7 @@ flutter build apk --debug --no-pub
 - [x] `flutter analyze` 성공
 - [x] Android debug APK CI 빌드 성공
 - [x] APK 체크섬과 artifact 생성
+- [x] APK 패키지와 금지 권한 검사
 - [ ] Wear OS 실기기에서 앱 실행
 - [ ] Wear OS 실기기에서 심박 표시
 - [ ] 권한 허용·거부 경로 확인
