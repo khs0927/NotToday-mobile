@@ -259,7 +259,7 @@ class EscalationStateMachine private constructor(
     ): TransitionResult = transition(
         event = event,
         nextStage = EscalationStage.RESOLVED,
-        candidateId = snapshot.activeCandidateId,
+        candidateId = null,
         reason = reason,
         cooldownUntilEpochMs = safeAdd(event.occurredAtEpochMs, cooldownMs),
     )
