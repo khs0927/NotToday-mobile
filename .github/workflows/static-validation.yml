@@ -1,0 +1,67 @@
+name: Static validation
+
+on:
+  push:
+    branches:
+      - main
+      - 'agent/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-static-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify safety baseline files
+        shell: bash
+        run: |
+          set -euo pipefail
+          required_files=(
+            "pubspec.yaml"
+            "lib/main.dart"
+            "lib/services/sensor_service.dart"
+            "android/app/src/main/AndroidManifest.xml"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/MainActivity.kt"
+            "docs/SAFETY_MODEL.md"
+            "docs/TEST_PLAN.md"
+          )
+
+          for path in "${required_files[@]}"; do
+            test -f "$path" || {
+              echo "Missing required file: $path"
+              exit 1
+            }
+          done
+
+      - name: Reject prohibited prototype behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -R -n -E \
+            'sendTextMessage|android.permission.SEND_SMS|35\.1796|129\.0756' \
+            lib android; then
+            echo "Prohibited automatic SMS or hard-coded location behavior found."
+            exit 1
+          fi
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve Dart dependencies
+        run: flutter pub get
+
+      - name: Parse and format-check Dart sources
+        run: dart format --output=none lib
+
+      - name: Analyze Flutter sources
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
