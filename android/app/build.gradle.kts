@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
     // Flutter's Gradle plugin must be applied after the Android plugin.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.devtools.ksp")
+    id("androidx.room")
 }
 
 android {
@@ -36,6 +38,10 @@ android {
         }
     }
 
+    room {
+        schemaDirectory("$projectDir/schemas")
+    }
+
     packaging {
         resources {
             excludes += setOf("META-INF/AL2.0", "META-INF/LGPL2.1")
@@ -52,6 +58,10 @@ kotlin {
 dependencies {
     // 1.17.0 is the API 36 line and matches Flutter 3.44.8 / AGP 9.0.1.
     implementation("androidx.core:core-ktx:1.17.0")
+
+    val roomVersion = "2.8.4"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
 
     testImplementation("junit:junit:4.13.2")
 }
