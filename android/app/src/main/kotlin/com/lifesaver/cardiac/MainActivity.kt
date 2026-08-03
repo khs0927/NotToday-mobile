@@ -44,20 +44,26 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "openEmergencyDialer" -> {
-                        val source = when (call.argument<String>("source")) {
-                            NativeSensorForegroundService.DIALER_SOURCE_PROMPT_TIMEOUT ->
-                                NativeSensorForegroundService.DIALER_SOURCE_PROMPT_TIMEOUT
-                            else -> NativeSensorForegroundService.DIALER_SOURCE_USER
-                        }
-                        dispatchServiceAction(
-                            action = NativeSensorForegroundService.ACTION_REQUEST_DIALER,
-                            extras = mapOf(
-                                NativeSensorForegroundService.EXTRA_DIALER_SOURCE to source,
-                                NativeSensorForegroundService.EXTRA_CANDIDATE_ID to
-                                    call.argument<String>("candidateId").orEmpty(),
-                            ),
+                        val source = DialerRequestSourceParser.parse(
+                            call.argument<String>("source"),
                         )
-                        result.success(null)
+                        if (source == null) {
+                            result.error(
+                                "INVALID_DIALER_SOURCE",
+                                "Dialer requests require an explicit source.",
+                                null,
+                            )
+                        } else {
+                            dispatchServiceAction(
+                                action = NativeSensorForegroundService.ACTION_REQUEST_DIALER,
+                                extras = mapOf(
+                                    NativeSensorForegroundService.EXTRA_DIALER_SOURCE to source.name,
+                                    NativeSensorForegroundService.EXTRA_CANDIDATE_ID to
+                                        call.argument<String>("candidateId").orEmpty(),
+                                ),
+                            )
+                            result.success(null)
+                        }
                     }
                     else -> result.notImplemented()
                 }
