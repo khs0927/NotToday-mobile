@@ -34,7 +34,10 @@ jobs:
             "android/app/src/main/AndroidManifest.xml"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/MainActivity.kt"
             "android/app/src/main/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachine.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/escalation/EscalationPersistence.kt"
+            "android/app/src/main/kotlin/com/lifesaver/cardiac/escalation/EscalationDatabase.kt"
             "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/EscalationStateMachineTest.kt"
+            "android/app/src/test/kotlin/com/lifesaver/cardiac/escalation/EscalationPersistenceTest.kt"
             "docs/BUILD.md"
             "docs/SAFETY_MODEL.md"
             "docs/TEST_PLAN.md"
@@ -142,6 +145,13 @@ jobs:
           cd android
           ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
+      - name: Compile Room persistence instrumentation test APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          ./gradlew :app:assembleDebugAndroidTest --no-daemon --stacktrace
+
       - name: Verify APK and create checksum
         shell: bash
         run: |
@@ -189,5 +199,6 @@ jobs:
             build/app-debug.permissions.txt
             build/app/reports/tests/testDebugUnitTest/**
             build/app/test-results/testDebugUnitTest/**
+            android/app/schemas/**
           if-no-files-found: error
           retention-days: 14

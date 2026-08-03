@@ -16,6 +16,8 @@ import com.lifesaver.cardiac.escalation.DialerRequestSource
 import com.lifesaver.cardiac.escalation.EscalationCoordinator
 import com.lifesaver.cardiac.escalation.MonotonicEpochClock
 import com.lifesaver.cardiac.escalation.EscalationSnapshot
+import com.lifesaver.cardiac.escalation.EscalationStateMachine
+import com.lifesaver.cardiac.escalation.RoomEscalationPersistence
 import com.lifesaver.cardiac.escalation.EscalationStage
 import com.lifesaver.cardiac.escalation.TransitionResult
 import io.flutter.plugin.common.EventChannel
@@ -27,6 +29,8 @@ class NativeSensorForegroundService : Service() {
     private lateinit var emergencyController: EmergencyDispatchController
     private lateinit var escalationCoordinator: EscalationCoordinator
     private lateinit var epochClock: MonotonicEpochClock
+    private var escalationPersistence: RoomEscalationPersistence? = null
+    private var persistenceHealthy = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private var monitoringActive = false
 
@@ -55,7 +59,51 @@ class NativeSensorForegroundService : Service() {
 
         epochClock = MonotonicEpochClock()
         emergencyController = EmergencyDispatchController(this)
-        escalationCoordinator = EscalationCoordinator()
+
+        val persistence = runCatching {
+            RoomEscalationPersistence.open(applicationContext)
+        }.getOrNull()
+        escalationPersistence = persistence
+
+        var machine = EscalationStateMachine(
+            initialTimestampEpochMs = epochClock.now(),
+        )
+        var persistedSnapshot: EscalationSnapshot? = null
+        if (persistence != null) {
+            try {
+                persistedSnapshot = persistence.loadSnapshot()
+                persistedSnapshot?.let { snapshot ->
+                    epochClock.observe(snapshot.updatedAtEpochMs)
+                }
+                if (persistedSnapshot != null) {
+                    machine = EscalationStateMachine.restorePersisted(
+                        persisted = persistedSnapshot,
+                        restoredAtEpochMs = epochClock.now(),
+                    )
+                }
+                check(persistence.initialize(machine.currentSnapshot())) {
+                    "INITIALIZE_FAILED"
+                }
+                if (
+                    persistedSnapshot != null &&
+                    !persistence.persistRestartNormalization(
+                        previous = persistedSnapshot,
+                        current = machine.currentSnapshot(),
+                        occurredAtEpochMs = epochClock.now(),
+                    )
+                ) {
+                    error("RESTART_NORMALIZATION_FAILED")
+                }
+                persistenceHealthy = true
+            } catch (exception: RuntimeException) {
+                Log.e(TAG, "Escalation persistence is unavailable.", exception)
+            }
+        }
+
+        escalationCoordinator = EscalationCoordinator(
+            machine = machine,
+            persistence = persistence.takeIf { persistenceHealthy },
+        )
 
         healthSensorManager = WearOSHealthSensorManager(this) { telemetry ->
             publishEvent(withSnapshot(telemetry))
@@ -77,25 +125,50 @@ class NativeSensorForegroundService : Service() {
         when (intent?.action ?: ACTION_START_MONITORING) {
             ACTION_CONFIRM_SAFE -> {
                 val candidateId = intent?.getStringExtra(EXTRA_CANDIDATE_ID).orEmpty()
-                publishTransition(
-                    escalationCoordinator.confirmSafe(
-                        candidateId = candidateId,
-                        occurredAtEpochMs = epochClock.now(),
-                    ),
-                    eventType = "USER_CONFIRMED_SAFE",
-                )
+                if (!persistenceHealthy) {
+                    publishEvent(
+                        withSnapshot(
+                            mapOf(
+                                "monitoring" to monitoringActive,
+                                "eventType" to "PERSISTENCE_UNAVAILABLE",
+                                "timestamp" to epochClock.now(),
+                            ),
+                        ),
+                    )
+                } else {
+                    publishTransition(
+                        escalationCoordinator.confirmSafe(
+                            candidateId = candidateId,
+                            occurredAtEpochMs = epochClock.now(),
+                        ),
+                        eventType = "USER_CONFIRMED_SAFE",
+                    )
+                }
                 stopIfActionStartedWithoutMonitoring(startId)
             }
 
             ACTION_REQUEST_DIALER -> {
-                val source = when (intent?.getStringExtra(EXTRA_DIALER_SOURCE)) {
-                    DIALER_SOURCE_PROMPT_TIMEOUT -> DialerRequestSource.PROMPT_TIMEOUT
-                    else -> DialerRequestSource.USER
-                }
-                handleDialerRequest(
-                    source = source,
-                    candidateId = intent?.getStringExtra(EXTRA_CANDIDATE_ID).orEmpty(),
+                val source = DialerRequestSourceParser.parse(
+                    intent?.getStringExtra(EXTRA_DIALER_SOURCE),
                 )
+                if (source == null) {
+                    publishEvent(
+                        withSnapshot(
+                            mapOf(
+                                "monitoring" to monitoringActive,
+                                "eventType" to "DIALER_REQUEST_REJECTED",
+                                "transitionAccepted" to false,
+                                "transitionRejectionReason" to "INVALID_DIALER_SOURCE",
+                                "timestamp" to epochClock.now(),
+                            ),
+                        ),
+                    )
+                } else {
+                    handleDialerRequest(
+                        source = source,
+                        candidateId = intent?.getStringExtra(EXTRA_CANDIDATE_ID).orEmpty(),
+                    )
+                }
                 stopIfActionStartedWithoutMonitoring(startId)
             }
 
@@ -111,6 +184,7 @@ class NativeSensorForegroundService : Service() {
             fallDetector.stop()
         }
         monitoringActive = false
+        escalationPersistence?.close()
         publishEvent(
             withSnapshot(
                 mapOf(
@@ -126,24 +200,56 @@ class NativeSensorForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startMonitoring() {
+        if (!persistenceHealthy) {
+            publishEvent(
+                withSnapshot(
+                    mapOf(
+                        "monitoring" to false,
+                        "eventType" to "PERSISTENCE_UNAVAILABLE",
+                        "timestamp" to epochClock.now(),
+                    ),
+                ),
+            )
+            return
+        }
+
         if (!monitoringActive) {
             healthSensorManager.startMonitoring()
             fallDetector.start()
             monitoringActive = true
         }
 
-        publishEvent(
-            withSnapshot(
-                mapOf(
-                    "monitoring" to true,
-                    "eventType" to "MONITORING_STARTED",
-                    "timestamp" to epochClock.now(),
-                ),
-            ),
+        val monitoringEvent = mutableMapOf<String, Any>(
+            "monitoring" to true,
+            "eventType" to "MONITORING_STARTED",
+            "timestamp" to epochClock.now(),
         )
+        if (
+            escalationCoordinator.currentSnapshot().stage ==
+            EscalationStage.SAFETY_CHECK
+        ) {
+            monitoringEvent["safetyCheckRequired"] = true
+        }
+        publishEvent(withSnapshot(monitoringEvent))
     }
 
     private fun handleFallCandidateEvent(event: FallCandidateEvent): Boolean {
+        if (!persistenceHealthy) {
+            publishEvent(
+                withSnapshot(
+                    mapOf(
+                        "monitoring" to monitoringActive,
+                        "eventType" to "PERSISTENCE_UNAVAILABLE",
+                        "candidateId" to event.candidateId,
+                        "candidateLifecycle" to "REJECTED",
+                        "candidateReason" to "PERSISTENCE_UNAVAILABLE",
+                        "timestamp" to epochClock.now(),
+                    ),
+                ),
+            )
+            return false
+        }
+
         val transition = escalationCoordinator.handleFallCandidate(event)
         val extras = mutableMapOf<String, Any>(
             "candidateLifecycle" to when (event) {
@@ -194,6 +300,19 @@ class NativeSensorForegroundService : Service() {
         source: DialerRequestSource,
         candidateId: String,
     ) {
+        if (!persistenceHealthy) {
+            publishEvent(
+                withSnapshot(
+                    mapOf(
+                        "monitoring" to monitoringActive,
+                        "eventType" to "PERSISTENCE_UNAVAILABLE",
+                        "timestamp" to epochClock.now(),
+                    ),
+                ),
+            )
+            return
+        }
+
         val requestTransition = escalationCoordinator.requestDialer(
             candidateId = candidateId,
             source = source,
@@ -238,6 +357,13 @@ class NativeSensorForegroundService : Service() {
         eventType: String,
         extras: Map<String, Any> = emptyMap(),
     ) {
+        if (
+            transition is TransitionResult.Rejected &&
+            transition.reason == "PERSISTENCE_UNAVAILABLE"
+        ) {
+            failClosedForPersistence()
+        }
+
         val payload = extras.toMutableMap()
         payload["eventType"] = eventType
         payload["monitoring"] = monitoringActive
@@ -257,6 +383,15 @@ class NativeSensorForegroundService : Service() {
         }
 
         publishEvent(payload)
+    }
+
+    private fun failClosedForPersistence() {
+        persistenceHealthy = false
+        if (!monitoringActive) return
+
+        monitoringActive = false
+        healthSensorManager.stopMonitoring()
+        fallDetector.stop()
     }
 
     private fun withSnapshot(event: Map<String, Any>): Map<String, Any> =
