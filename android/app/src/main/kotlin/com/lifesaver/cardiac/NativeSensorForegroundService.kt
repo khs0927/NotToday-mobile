@@ -148,14 +148,27 @@ class NativeSensorForegroundService : Service() {
             }
 
             ACTION_REQUEST_DIALER -> {
-                val source = when (intent?.getStringExtra(EXTRA_DIALER_SOURCE)) {
-                    DIALER_SOURCE_PROMPT_TIMEOUT -> DialerRequestSource.PROMPT_TIMEOUT
-                    else -> DialerRequestSource.USER
-                }
-                handleDialerRequest(
-                    source = source,
-                    candidateId = intent?.getStringExtra(EXTRA_CANDIDATE_ID).orEmpty(),
+                val source = DialerRequestSourceParser.parse(
+                    intent?.getStringExtra(EXTRA_DIALER_SOURCE),
                 )
+                if (source == null) {
+                    publishEvent(
+                        withSnapshot(
+                            mapOf(
+                                "monitoring" to monitoringActive,
+                                "eventType" to "DIALER_REQUEST_REJECTED",
+                                "transitionAccepted" to false,
+                                "transitionRejectionReason" to "INVALID_DIALER_SOURCE",
+                                "timestamp" to epochClock.now(),
+                            ),
+                        ),
+                    )
+                } else {
+                    handleDialerRequest(
+                        source = source,
+                        candidateId = intent?.getStringExtra(EXTRA_CANDIDATE_ID).orEmpty(),
+                    )
+                }
                 stopIfActionStartedWithoutMonitoring(startId)
             }
 
