@@ -1,0 +1,19 @@
+# Flutter/Dart
+.dart_tool/
+.build/
+.packages
+.pub-cache/
+.pub/
+build/
+flutter_*.png
+flutter_*.jpg
+
+# Python (database/)
+__pycache__/
+*.pyc
+
+# 시크릿 (커밋 절대 금지)
+.env
+
+# OS
+.DS_Store
