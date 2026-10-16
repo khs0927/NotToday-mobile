@@ -34,3 +34,11 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# From main (Flutter/Python extras)
+.build/
+.pub-cache/
+flutter_*.png
+flutter_*.jpg
+__pycache__/
+*.pyc
