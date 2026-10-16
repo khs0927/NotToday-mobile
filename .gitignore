@@ -1,19 +1,44 @@
-# Flutter/Dart
+# Dart / Flutter
 .dart_tool/
-.build/
 .packages
-.pub-cache/
 .pub/
+pubspec.lock
 build/
-flutter_*.png
-flutter_*.jpg
+.flutter-plugins
+.flutter-plugins-dependencies
 
-# Python (database/)
-__pycache__/
-*.pyc
+# Android
+android/.gradle/
+android/local.properties
+android/captures/
+android/key.properties
+*.jks
+*.keystore
 
-# 시크릿 (커밋 절대 금지)
-.env
+# IDE
+.idea/
+.vscode/
+*.iml
 
 # OS
 .DS_Store
+Thumbs.db
+
+# Logs and local data
+*.log
+*.db
+*.db-shm
+*.db-wal
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# From main (Flutter/Python extras)
+.build/
+.pub-cache/
+flutter_*.png
+flutter_*.jpg
+__pycache__/
+*.pyc
